@@ -249,6 +249,7 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
 // ===== State =====
 let app = null;
 let envId = '';
+let uid = '';
 let activeTab = 'products';
 let activeCategory = '全部';
 let products = [];
@@ -302,6 +303,11 @@ async function doLogin() {
     app = cloudbase.init({ env: envInput });
     await app.auth({ persistence: 'local' }).signInWithUsernameAndPassword(username, password);
 
+    // 获取用户 UID
+    const user = await app.auth().getCurrentUser();
+    uid = user && user.uid ? user.uid : '';
+    console.log('login uid:', uid);
+
     envId = envInput;
     localStorage.setItem('cp_envId', envId);
     localStorage.setItem('cp_username', username);
@@ -321,7 +327,7 @@ function doLogout() {
   localStorage.removeItem('cp_envId');
   localStorage.removeItem('cp_username');
   if (app) app.auth().signOut().catch(() => {});
-  app = null; envId = '';
+  app = null; envId = ''; uid = '';
   document.getElementById('loginOverlay').classList.remove('hide');
   document.getElementById('app').classList.remove('show');
 }
@@ -602,10 +608,10 @@ async function saveProduct() {
   try {
     if (editingProductId) {
       console.log('→ adminUpdateProduct');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateProduct', id: editingProductId, data } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateProduct', _uid: uid, id: editingProductId, data } });
     } else {
       console.log('→ adminCreateProduct');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateProduct', data } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateProduct', _uid: uid, data } });
     }
     closeModal('productModal');
     await loadProducts();
@@ -617,7 +623,7 @@ async function saveProduct() {
 async function deleteProduct(id, name) {
   if (!confirm('确认删除产品"' + name + '"？\\n删除后用户将不可见。')) return;
   try {
-    await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminDeleteProduct', id } });
+    await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminDeleteProduct', _uid: uid, id } });
     await loadProducts();
     renderAll();
     showToast('已删除');
@@ -659,10 +665,10 @@ async function saveCategory() {
   try {
     if (editingCategoryId) {
       console.log('→ adminUpdateCategory');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateCategory', id: editingCategoryId, data } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateCategory', _uid: uid, id: editingCategoryId, data } });
     } else {
       console.log('→ adminCreateCategory');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateCategory', data } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateCategory', _uid: uid, data } });
     }
     closeModal('categoryModal');
     await loadCategories();
