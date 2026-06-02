@@ -267,6 +267,25 @@ const savedUsername = localStorage.getItem('cp_username');
 if (savedEnvId) document.getElementById('envIdInput').value = savedEnvId;
 if (savedUsername) document.getElementById('usernameInput').value = savedUsername;
 
+// 自动恢复登录状态
+if (savedEnvId) {
+  (async () => {
+    try {
+      app = cloudbase.init({ env: savedEnvId });
+      const loginState = await app.auth({ persistence: 'local' }).getLoginState();
+      if (loginState && loginState.user) {
+        envId = savedEnvId;
+        document.getElementById('loginOverlay').classList.add('hide');
+        document.getElementById('app').classList.add('show');
+        document.getElementById('envDisplay').textContent = '环境: ' + envId;
+        await loadAll();
+      }
+    } catch (_) {
+      // 未登录，停留在登录页
+    }
+  })();
+}
+
 // ===== Login =====
 async function doLogin() {
   const envInput = document.getElementById('envIdInput').value.trim();
