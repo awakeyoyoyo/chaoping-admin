@@ -660,7 +660,7 @@ async function saveCategory() {
     status: document.getElementById('cf_status').value
   };
 
-  console.log('saveCategory', { app: !!app, editingCategoryId, data });
+  console.log('saveCategory', { app: !!app, uid, editingCategoryId, data });
 
   try {
     if (editingCategoryId) {
