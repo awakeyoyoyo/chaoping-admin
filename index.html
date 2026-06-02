@@ -608,10 +608,10 @@ async function saveProduct() {
   try {
     if (editingProductId) {
       console.log('→ adminUpdateProduct');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateProduct', _uid: uid, id: editingProductId, data } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateProduct', clientUid: uid, id: editingProductId, data } });
     } else {
       console.log('→ adminCreateProduct');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateProduct', _uid: uid, data } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateProduct', clientUid: uid, data } });
     }
     closeModal('productModal');
     await loadProducts();
@@ -623,7 +623,7 @@ async function saveProduct() {
 async function deleteProduct(id, name) {
   if (!confirm('确认删除产品"' + name + '"？\\n删除后用户将不可见。')) return;
   try {
-    await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminDeleteProduct', _uid: uid, id } });
+    await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminDeleteProduct', clientUid: uid, id } });
     await loadProducts();
     renderAll();
     showToast('已删除');
@@ -665,10 +665,10 @@ async function saveCategory() {
   try {
     if (editingCategoryId) {
       console.log('→ adminUpdateCategory');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateCategory', _uid: uid, id: editingCategoryId, data } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateCategory', clientUid: uid, id: editingCategoryId, data } });
     } else {
       console.log('→ adminCreateCategory');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateCategory', _uid: uid, data } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateCategory', clientUid: uid, data } });
     }
     closeModal('categoryModal');
     await loadCategories();
