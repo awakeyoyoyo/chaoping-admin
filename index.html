@@ -597,17 +597,21 @@ async function saveProduct() {
     status: document.getElementById('pf_status').value,
   };
 
+  console.log('saveProduct', { app: !!app, editingProductId, data });
+
   try {
     if (editingProductId) {
+      console.log('→ adminUpdateProduct');
       await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateProduct', id: editingProductId, data } });
     } else {
+      console.log('→ adminCreateProduct');
       await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateProduct', data } });
     }
     closeModal('productModal');
     await loadProducts();
     renderAll();
     showToast(editingProductId ? '产品已更新' : '产品已创建');
-  } catch(e) { showToast('操作失败: ' + (e.message || '')); console.error(e); }
+  } catch(e) { console.error('saveProduct error:', e); showToast('操作失败: ' + (e.message || '')); }
 }
 
 async function deleteProduct(id, name) {
@@ -649,17 +653,21 @@ async function saveCategory() {
     status: document.getElementById('cf_status').value
   };
 
+  console.log('saveCategory', { app: !!app, editingCategoryId, data });
+
   try {
     if (editingCategoryId) {
+      console.log('→ adminUpdateCategory');
       await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateCategory', id: editingCategoryId, data } });
     } else {
+      console.log('→ adminCreateCategory');
       await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateCategory', data } });
     }
     closeModal('categoryModal');
     await loadCategories();
     renderAll();
     showToast(editingCategoryId ? '分类已更新' : '分类已创建');
-  } catch(e) { showToast('操作失败: ' + (e.message || '')); console.error(e); }
+  } catch(e) { console.error('saveCategory error:', e); showToast('操作失败: ' + (e.message || '')); }
 }
 
 // ===== Modal =====
