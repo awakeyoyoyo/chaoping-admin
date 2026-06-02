@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝平农业 - 后台管理</title>
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3f7f0; color:#17351f; }
+
+/* Login */
+.login-overlay {
+  position:fixed; top:0; left:0; right:0; bottom:0; z-index:999;
+  background:#f3f7f0; display:flex; align-items:center; justify-content:center;
+}
+.login-card {
+  width:420px; padding:48px 36px; border-radius:24px; background:#fff;
+  box-shadow:0 12px 40px rgba(31,122,57,0.12); text-align:center;
+}
+.login-card h1 { font-size:28px; margin-bottom:8px; color:#1f7a39; }
+.login-card .sub { color:#708070; font-size:14px; margin-bottom:32px; }
+.login-card label { display:block; text-align:left; margin-bottom:6px; font-size:14px; font-weight:600; color:#333; }
+.login-card input {
+  width:100%; height:44px; padding:0 14px; border:2px solid #e0e8e0; border-radius:12px;
+  font-size:14px; margin-bottom:18px; outline:none; background:#f9fbf9;
+}
+.login-card input:focus { border-color:#2f8a42; }
+.login-card .btn {
+  width:100%; height:46px; border:none; border-radius:12px; background:linear-gradient(135deg,#1f7a39,#2f8a42);
+  color:#fff; font-size:16px; font-weight:600; cursor:pointer;
+}
+.login-card .btn:hover { opacity:0.92; }
+.login-card .hint { margin-top:16px; font-size:12px; color:#a0b0a0; line-height:1.6; }
+.login-card .error { color:#d32f2f; font-size:13px; margin-top:8px; }
+
+/* Layout */
+.app { display:none; height:100vh; flex-direction:column; }
+.app.show { display:flex; }
+.login-overlay.hide { display:none; }
+
+/* Top bar */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 24px; height:56px; background:linear-gradient(135deg,#1f7a39,#61b15a); color:#fff;
+  flex-shrink:0;
+}
+.topbar h2 { font-size:18px; }
+.topbar .logout-btn { padding:6px 16px; border:1px solid rgba(255,255,255,0.6); border-radius:20px; background:transparent; color:#fff; font-size:13px; cursor:pointer; }
+.topbar .logout-btn:hover { background:rgba(255,255,255,0.15); }
+
+/* Main */
+.main { display:flex; flex:1; overflow:hidden; }
+
+/* Sidebar */
+.sidebar {
+  width:200px; background:#fff; border-right:1px solid #e8efe8;
+  display:flex; flex-direction:column; flex-shrink:0;
+}
+.sidebar-nav { display:flex; border-bottom:1px solid #e8efe8; }
+.sidebar-nav .nav-item {
+  flex:1; text-align:center; padding:16px 0; font-size:14px; cursor:pointer;
+  border-bottom:3px solid transparent; color:#708070; font-weight:600;
+}
+.sidebar-nav .nav-item.active { color:#2f8a42; border-bottom-color:#2f8a42; }
+.sidebar-list { flex:1; overflow-y:auto; padding:8px 0; }
+.sidebar-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px; cursor:pointer; font-size:14px; color:#536453;
+  border-left:4px solid transparent; transition:all 0.15s;
+}
+.sidebar-item:hover { background:#f6faf6; }
+.sidebar-item.active { background:#f3f7f0; color:#2f8a42; font-weight:700; border-left-color:#2f8a42; }
+.sidebar-item .count { font-size:12px; color:#999; }
+.sidebar-add {
+  margin:8px 16px 16px; padding:10px 0; border:2px dashed #c8dcc8; border-radius:12px;
+  background:transparent; color:#2f8a42; font-size:13px; cursor:pointer; text-align:center; width:calc(100% - 32px);
+}
+.sidebar-add:hover { background:#f0f7f0; }
+
+/* Content */
+.content { flex:1; overflow-y:auto; padding:20px 24px; }
+.content-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.content-header h3 { font-size:20px; }
+.content-header .add-btn {
+  padding:10px 22px; border:none; border-radius:20px; background:#2f8a42;
+  color:#fff; font-size:14px; font-weight:600; cursor:pointer;
+}
+.content-header .add-btn:hover { opacity:0.9; }
+
+/* Product cards */
+.product-grid { display:flex; flex-direction:column; gap:12px; }
+.product-card {
+  display:flex; gap:16px; padding:20px; border-radius:16px; background:#fff;
+  box-shadow:0 4px 16px rgba(34,96,51,0.06);
+}
+.product-icon {
+  display:flex; align-items:center; justify-content:center;
+  width:64px; height:64px; border-radius:18px; background:#e5f3e7;
+  color:#2f8a42; font-size:26px; font-weight:700; flex-shrink:0;
+}
+.product-info { flex:1; min-width:0; }
+.product-info .name { font-size:17px; font-weight:700; }
+.product-info .ingredient { color:#536453; font-size:13px; margin-top:4px; }
+.product-info .meta { color:#708070; font-size:12px; margin-top:4px; }
+.product-info .spec { color:#8a6a2a; font-size:12px; margin-top:4px; padding-top:4px; border-top:1px solid #edf2ed; }
+.product-actions { display:flex; flex-direction:column; gap:8px; flex-shrink:0; }
+.product-actions button {
+  padding:6px 16px; border:1px solid #dce9dd; border-radius:14px;
+  background:#fff; font-size:12px; cursor:pointer;
+}
+.product-actions .edit-btn { color:#2f8a42; border-color:#bfe4c7; }
+.product-actions .edit-btn:hover { background:#eef8ef; }
+.product-actions .del-btn { color:#d32f2f; border-color:#fce4e4; }
+.product-actions .del-btn:hover { background:#fef5f5; }
+.status-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:11px; }
+.status-badge.active { background:#e5f3e7; color:#2f8a42; }
+.status-badge.inactive { background:#f5f5f5; color:#999; }
+.status-badge.deleted { background:#fce4e4; color:#d32f2f; }
+
+/* Category list (in content area) */
+.cat-list { display:flex; flex-direction:column; gap:10px; }
+.cat-card {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 20px; border-radius:14px; background:#fff;
+  box-shadow:0 2px 10px rgba(34,96,51,0.04);
+}
+.cat-card .cat-info .cat-name { font-size:16px; font-weight:600; }
+.cat-card .cat-info .cat-meta { font-size:12px; color:#708070; margin-top:2px; }
+.cat-card .edit-btn { padding:6px 16px; border:1px solid #bfe4c7; border-radius:14px; background:#fff; color:#2f8a42; cursor:pointer; font-size:12px; }
+
+/* Modal */
+.modal-mask {
+  display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:100;
+  background:rgba(0,0,0,0.4); align-items:center; justify-content:center;
+}
+.modal-mask.show { display:flex; }
+.modal-box {
+  width:600px; max-height:80vh; background:#fff; border-radius:20px;
+  display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.2);
+}
+.modal-box h3 { padding:24px 28px 16px; font-size:20px; border-bottom:1px solid #edf2ed; }
+.modal-body { padding:20px 28px; overflow-y:auto; flex:1; }
+.modal-body .field { margin-bottom:18px; }
+.modal-body .field label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:#333; }
+.modal-body .field input, .modal-body .field textarea, .modal-body .field select {
+  width:100%; padding:10px 14px; border:2px solid #e0e8e0; border-radius:10px;
+  font-size:14px; outline:none; background:#f9fbf9; font-family:inherit;
+}
+.modal-body .field input:focus, .modal-body .field textarea:focus, .modal-body .field select:focus { border-color:#2f8a42; }
+.modal-body .field textarea { min-height:80px; resize:vertical; }
+.modal-body .row { display:flex; gap:12px; }
+.modal-body .row .field { flex:1; }
+.modal-body .dynamic-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.modal-body .dynamic-row input { flex:1; }
+.modal-body .dynamic-row .rm-btn {
+  width:28px; height:28px; border:none; border-radius:50%; background:#fce4e4; color:#d32f2f;
+  cursor:pointer; font-size:14px; line-height:28px; text-align:center; flex-shrink:0;
+}
+.modal-body .add-row-btn { padding:8px 0; border:2px dashed #c8dcc8; border-radius:10px; background:transparent; color:#2f8a42; cursor:pointer; width:100%; font-size:13px; }
+.modal-body .add-row-btn:hover { background:#f0f7f0; }
+.modal-footer { padding:16px 28px 24px; display:flex; gap:12px; justify-content:flex-end; border-top:1px solid #edf2ed; }
+.modal-footer button { padding:10px 28px; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer; }
+.modal-footer .cancel-btn { border:1px solid #dce9dd; background:#fff; color:#708070; }
+.modal-footer .save-btn { border:none; background:#2f8a42; color:#fff; }
+.modal-footer .save-btn:hover { opacity:0.9; }
+
+/* Toast */
+.toast { display:none; position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:200; padding:12px 28px; border-radius:20px; background:#333; color:#fff; font-size:14px; }
+.toast.show { display:block; animation:fadeInOut 2s forwards; }
+@keyframes fadeInOut { 0%{opacity:0} 15%{opacity:1} 70%{opacity:1} 100%{opacity:0} }
+
+.empty { text-align:center; padding:80px 20px; color:#708070; font-size:15px; }
+.loading { text-align:center; padding:60px 20px; color:#708070; font-size:14px; }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-card">
+    <h1>🌾 朝平农业后台</h1>
+    <div class="sub">产品与分类数据管理</div>
+    <label>云环境 ID</label>
+    <input type="text" id="envIdInput" placeholder="输入云环境ID，如 cloud-xxx">
+    <label>管理员密钥</label>
+    <input type="password" id="adminKeyInput" placeholder="输入管理员密钥">
+    <button class="btn" onclick="doLogin()">连接并验证</button>
+    <div class="hint">
+      云环境ID 在微信云开发控制台获取<br>
+      管理员密钥需先在 admins 集合中配置<br>
+      插入 { role: "system", adminKey: "你的密钥" }
+    </div>
+    <div class="error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app" class="app">
+  <div class="topbar">
+    <h2>🌾 后台管理</h2>
+    <div>
+      <span style="font-size:13px;opacity:0.85;margin-right:12px;" id="envDisplay"></span>
+      <button class="logout-btn" onclick="doLogout()">退出</button>
+    </div>
+  </div>
+  <div class="main">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-nav">
+        <div class="nav-item active" data-tab="products" onclick="switchTab('products')">产品</div>
+        <div class="nav-item" data-tab="categories" onclick="switchTab('categories')">分类</div>
+      </div>
+      <!-- Product sidebar: category filter -->
+      <div id="productSidebar" class="sidebar-list"></div>
+      <div id="categorySidebar" class="sidebar-list" style="display:none;"></div>
+      <button id="sidebarAddBtn" class="sidebar-add" onclick="onSidebarAdd()">+ 添加</button>
+    </div>
+    <!-- Content -->
+    <div class="content" id="contentArea"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<!-- Product Form Modal -->
+<div id="productModal" class="modal-mask" onclick="closeModal('productModal')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <h3 id="productModalTitle">添加产品</h3>
+    <div class="modal-body" id="productModalBody"></div>
+    <div class="modal-footer">
+      <button class="cancel-btn" onclick="closeModal('productModal')">取消</button>
+      <button class="save-btn" id="productSaveBtn" onclick="saveProduct()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Category Form Modal -->
+<div id="categoryModal" class="modal-mask" onclick="closeModal('categoryModal')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <h3 id="categoryModalTitle">添加分类</h3>
+    <div class="modal-body" id="categoryModalBody"></div>
+    <div class="modal-footer">
+      <button class="cancel-btn" onclick="closeModal('categoryModal')">取消</button>
+      <button class="save-btn" id="categorySaveBtn" onclick="saveCategory()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== State =====
+let app = null;
+let envId = '';
+let adminKey = '';
+let activeTab = 'products';
+let activeCategory = '全部';
+let products = [];
+let categories = [];
+let editingProductId = null;
+let editingCategoryId = null;
+
+// ===== Init =====
+document.getElementById('envIdInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('adminKeyInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// Restore saved config
+const savedEnvId = localStorage.getItem('cp_envId');
+const savedAdminKey = localStorage.getItem('cp_adminKey');
+if (savedEnvId) document.getElementById('envIdInput').value = savedEnvId;
+if (savedAdminKey) document.getElementById('adminKeyInput').value = savedAdminKey;
+
+// ===== Login =====
+async function doLogin() {
+  const envInput = document.getElementById('envIdInput').value.trim();
+  const keyInput = document.getElementById('adminKeyInput').value.trim();
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+
+  if (!envInput) { errEl.textContent = '请输入云环境ID'; return; }
+  if (!keyInput) { errEl.textContent = '请输入管理员密钥'; return; }
+
+  try {
+    app = cloudbase.init({ env: envInput });
+    await app.auth({ persistence: 'local' }).anonymousAuthProvider().signIn();
+
+    // Verify admin key
+    const resp = await app.callFunction({
+      name: 'quickstartFunctions',
+      data: { type: 'adminCheckAuth', adminKey: keyInput }
+    });
+    const result = resp.result || {};
+
+    if (!result.success || !result.isAdmin) {
+      errEl.textContent = result.errMsg || '密钥验证失败';
+      await app.auth().signOut();
+      app = null;
+      return;
+    }
+
+    envId = envInput;
+    adminKey = keyInput;
+    localStorage.setItem('cp_envId', envId);
+    localStorage.setItem('cp_adminKey', adminKey);
+
+    document.getElementById('loginOverlay').classList.add('hide');
+    document.getElementById('app').classList.add('show');
+    document.getElementById('envDisplay').textContent = '环境: ' + envId;
+
+    await loadAll();
+  } catch (e) {
+    errEl.textContent = '连接失败: ' + (e.message || '请检查环境ID和网络');
+    console.error(e);
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem('cp_envId');
+  localStorage.removeItem('cp_adminKey');
+  if (app) app.auth().signOut().catch(() => {});
+  app = null; envId = ''; adminKey = '';
+  document.getElementById('loginOverlay').classList.remove('hide');
+  document.getElementById('app').classList.remove('show');
+}
+
+// ===== Load =====
+async function loadAll() {
+  await Promise.all([loadProducts(), loadCategories()]);
+  renderAll();
+}
+
+async function loadProducts() {
+  try {
+    const resp = await app.callFunction({
+      name: 'quickstartFunctions',
+      data: { type: 'getProducts', includeInactive: true, pageSize: 200 }
+    });
+    products = (resp.result && resp.result.success) ? (resp.result.data || []) : [];
+  } catch(e) { console.error('loadProducts', e); products = []; }
+}
+
+async function loadCategories() {
+  try {
+    const resp = await app.callFunction({
+      name: 'quickstartFunctions',
+      data: { type: 'getCategories' }
+    });
+    categories = (resp.result && resp.result.success) ? (resp.result.data || []) : [];
+  } catch(e) { console.error('loadCategories', e); categories = []; }
+}
+
+// ===== Tab Switch =====
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab);
+  });
+  activeCategory = '全部';
+  renderAll();
+}
+
+// ===== Render =====
+function renderAll() {
+  renderSidebar();
+  renderContent();
+  document.getElementById('sidebarAddBtn').textContent = activeTab === 'products' ? '+ 添加产品' : '+ 添加分类';
+  document.getElementById('sidebarAddBtn').onclick = activeTab === 'products' ? () => openProductForm() : () => openCategoryForm();
+  document.getElementById('productSidebar').style.display = activeTab === 'products' ? '' : 'none';
+  document.getElementById('categorySidebar').style.display = activeTab === 'categories' ? '' : 'none';
+}
+
+function renderSidebar() {
+  if (activeTab === 'products') {
+    const filtered = activeCategory === '全部' ? products : products.filter(p => p.category === activeCategory);
+    const catCounts = {};
+    products.forEach(p => { catCounts[p.category] = (catCounts[p.category] || 0) + 1; });
+
+    let html = `<div class="sidebar-item ${activeCategory === '全部' ? 'active' : ''}" onclick="selectCategory('全部')">
+      <span>全部产品</span><span class="count">${products.length}</span></div>`;
+    categories.forEach(c => {
+      const count = catCounts[c.name] || 0;
+      html += `<div class="sidebar-item ${activeCategory === c.name ? 'active' : ''}" onclick="selectCategory('${c.name}')">
+        <span>${c.iconText || '📦'} ${c.name}</span><span class="count">${count}</span></div>`;
+    });
+    document.getElementById('productSidebar').innerHTML = html;
+  } else {
+    let html = '';
+    categories.forEach(c => {
+      html += `<div class="sidebar-item ${activeCategory === c._id ? 'active' : ''}" onclick="selectCategoryItem('${c._id}')">
+        <span>${c.iconText || '📦'} ${c.name}</span><span class="count">排序${c.sort || 0}</span></div>`;
+    });
+    document.getElementById('categorySidebar').innerHTML = html;
+  }
+}
+
+function selectCategory(cat) {
+  activeCategory = cat;
+  renderAll();
+}
+
+function selectCategoryItem(id) {
+  activeCategory = id;
+  renderAll();
+}
+
+function onSidebarAdd() {
+  if (activeTab === 'products') openProductForm();
+  else openCategoryForm();
+}
+
+function renderContent() {
+  const area = document.getElementById('contentArea');
+  if (activeTab === 'products') {
+    let filtered = activeCategory === '全部' ? products : products.filter(p => p.category === activeCategory);
+
+    let html = `<div class="content-header">
+      <h3>${activeCategory} <span style="font-size:14px;color:#708070;font-weight:400;">(${filtered.length}个)</span></h3>
+      <button class="add-btn" onclick="openProductForm()">+ 添加产品</button></div>`;
+
+    if (filtered.length === 0) {
+      html += '<div class="empty">暂无产品数据</div>';
+    } else {
+      html += '<div class="product-grid">';
+      filtered.forEach(p => {
+        const ingText = (p.active_ingredients || []).map(i => i.name + (i.concentration || '')).join(' + ') || '成分待补充';
+        html += `<div class="product-card">
+          <div class="product-icon">${p.iconText || '品'}</div>
+          <div class="product-info">
+            <div class="name">${escHtml(p.name)} <span class="status-badge ${p.status || 'active'}">${statusLabel(p.status)}</span></div>
+            <div class="ingredient">${escHtml(ingText)}</div>
+            <div class="meta">剂型：${escHtml(p.formulation || '待补充')} | 登记号：${escHtml(p.registration_number || '待补充')}</div>
+            <div class="spec">规格：${escHtml(p.specification || '待补充')}</div>
+          </div>
+          <div class="product-actions">
+            <button class="edit-btn" onclick="openProductForm('${p._id}')">编辑</button>
+            <button class="del-btn" onclick="deleteProduct('${p._id}','${escHtml(p.name)}')">删除</button>
+          </div></div>`;
+      });
+      html += '</div>';
+    }
+    area.innerHTML = html;
+  } else {
+    let html = `<div class="content-header">
+      <h3>分类管理 <span style="font-size:14px;color:#708070;font-weight:400;">(${categories.length}个)</span></h3>
+      <button class="add-btn" onclick="openCategoryForm()">+ 添加分类</button></div>`;
+
+    if (categories.length === 0) {
+      html += '<div class="empty">暂无分类数据</div>';
+    } else {
+      html += '<div class="cat-list">';
+      categories.forEach(c => {
+        html += `<div class="cat-card">
+          <div class="cat-info">
+            <div class="cat-name">${escHtml(c.iconText || '📦')} ${escHtml(c.name)} <span class="status-badge ${c.status || 'active'}">${statusLabel(c.status)}</span></div>
+            <div class="cat-meta">排序：${c.sort || 0} | 更新时间：${fmtDate(c.update_time)}</div>
+          </div>
+          <button class="edit-btn" onclick="openCategoryForm('${c._id}')">编辑</button></div>`;
+      });
+      html += '</div>';
+    }
+    area.innerHTML = html;
+  }
+}
+
+// ===== Product Form =====
+function openProductForm(id) {
+  editingProductId = id || null;
+  const product = id ? products.find(p => p._id === id) : null;
+  document.getElementById('productModalTitle').textContent = id ? '编辑产品' : '添加产品';
+
+  const catOptions = categories.map(c => `<option value="${escHtml(c.name)}" ${product && product.category === c.name ? 'selected' : ''}>${escHtml(c.name)}</option>`).join('');
+
+  const ingredients = (product && product.active_ingredients && product.active_ingredients.length)
+    ? product.active_ingredients : [{ name: '', concentration: '' }];
+  const kps = (product && product.key_points && product.key_points.length) ? product.key_points : [];
+  const usage = product && product.usage_scope ? product.usage_scope : { crops: '', target: '', dosage: '', method: '' };
+
+  let html = `
+    <div class="field"><label>产品名称 *</label><input id="pf_name" value="${escAttr(product ? product.name : '')}"></div>
+    <div class="field"><label>分类 *</label><select id="pf_category">${catOptions}</select></div>
+    <div class="row">
+      <div class="field"><label>单字图标</label><input id="pf_iconText" value="${escAttr(product ? product.iconText || '' : '')}" maxlength="1" placeholder="如：菌"></div>
+      <div class="field"><label>剂型 *</label><input id="pf_formulation" value="${escAttr(product ? product.formulation || '' : '')}" placeholder="如：微乳剂"></div>
+    </div>
+    <div class="field"><label>登记号 *</label><input id="pf_reg" value="${escAttr(product ? product.registration_number || '' : '')}" placeholder="如：PD20260826"></div>
+    <div class="field"><label>规格</label><input id="pf_spec" value="${escAttr(product ? product.specification || '' : '')}" placeholder="如：100毫升*50瓶"></div>
+    <div class="field"><label>有效成分 *</label>
+      <div id="ingredientsContainer">${renderDynamicRows(ingredients, 'ingredient', '成分名', '浓度')}</div>
+      <button class="add-row-btn" onclick="addDynamicRow('ingredientsContainer','ingredient',{name:'',concentration:''})">+ 添加有效成分</button>
+    </div>
+    <div class="field"><label>产品性能</label><textarea id="pf_performance">${escHtml(product ? product.performance || '' : '')}</textarea></div>
+    <div class="field"><label>关键卖点</label>
+      <div id="kpsContainer">${renderDynamicRows(kps, 'kp', '卖点描述')}</div>
+      <button class="add-row-btn" onclick="addDynamicRow('kpsContainer','kp', '')">+ 添加卖点</button>
+    </div>
+    <div class="field"><label>使用范围</label>
+      <div class="row">
+        <div class="field"><label style="font-weight:400;font-size:12px;">作物</label><input id="pf_crops" value="${escAttr(usage.crops || '')}"></div>
+        <div class="field"><label style="font-weight:400;font-size:12px;">防治对象</label><input id="pf_target" value="${escAttr(usage.target || '')}"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label style="font-weight:400;font-size:12px;">用量</label><input id="pf_dosage" value="${escAttr(usage.dosage || '')}"></div>
+        <div class="field"><label style="font-weight:400;font-size:12px;">方法</label><input id="pf_method" value="${escAttr(usage.method || '')}"></div>
+      </div>
+    </div>
+    <div class="field"><label>使用技术要求</label><textarea id="pf_tech">${escHtml(product ? product.technical_requirements || '' : '')}</textarea></div>
+    <div class="field"><label>启用状态</label><select id="pf_status">
+      <option value="active" ${product && product.status === 'active' ? 'selected' : ''}>上架</option>
+      <option value="inactive" ${!product || product.status !== 'active' ? 'selected' : ''}>下架</option>
+    </select></div>`;
+
+  document.getElementById('productModalBody').innerHTML = html;
+  document.getElementById('productModal').classList.add('show');
+}
+
+function renderDynamicRows(items, prefix, placeholder1, placeholder2) {
+  return items.map((item, i) => {
+    if (typeof item === 'string') {
+      return `<div class="dynamic-row">
+        <input value="${escAttr(item)}" data-prefix="${prefix}" data-idx="${i}" data-sub="value" placeholder="${placeholder1}">
+        <div class="rm-btn" onclick="removeDynamicRow(this,'${prefix}')">✕</div></div>`;
+    }
+    return `<div class="dynamic-row">
+      <input value="${escAttr(item.name || '')}" data-prefix="${prefix}" data-idx="${i}" data-sub="name" placeholder="${placeholder1 || '名称'}">
+      ${placeholder2 ? `<input value="${escAttr(item.concentration || '')}" data-prefix="${prefix}" data-idx="${i}" data-sub="concentration" placeholder="${placeholder2}">` : ''}
+      <div class="rm-btn" onclick="removeDynamicRow(this,'${prefix}')">✕</div></div>`;
+  }).join('');
+}
+
+function addDynamicRow(containerId, prefix, defaultValue) {
+  const container = document.getElementById(containerId);
+  const idx = container.querySelectorAll('.dynamic-row').length;
+  const div = document.createElement('div');
+  div.className = 'dynamic-row';
+  if (typeof defaultValue === 'object') {
+    div.innerHTML = `<input data-prefix="${prefix}" data-idx="${idx}" data-sub="name" placeholder="成分名">
+      <input data-prefix="${prefix}" data-idx="${idx}" data-sub="concentration" placeholder="浓度">
+      <div class="rm-btn" onclick="removeDynamicRow(this,'${prefix}')">✕</div>`;
+  } else {
+    div.innerHTML = `<input data-prefix="${prefix}" data-idx="${idx}" data-sub="value" placeholder="卖点描述">
+      <div class="rm-btn" onclick="removeDynamicRow(this,'${prefix}')">✕</div>`;
+  }
+  container.appendChild(div);
+}
+
+function removeDynamicRow(btn, prefix) {
+  btn.parentElement.remove();
+}
+
+function collectDynamicRows(containerId, prefix, isObject) {
+  const container = document.getElementById(containerId);
+  const rows = container.querySelectorAll('.dynamic-row');
+  const result = [];
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (isObject) {
+      const name = (inputs[0] && inputs[0].value || '').trim();
+      const conc = (inputs[1] && inputs[1].value || '').trim();
+      if (name) result.push({ name, concentration: conc });
+    } else {
+      const val = (inputs[0] && inputs[0].value || '').trim();
+      if (val) result.push(val);
+    }
+  });
+  return result;
+}
+
+async function saveProduct() {
+  const name = document.getElementById('pf_name').value.trim();
+  const category = document.getElementById('pf_category').value;
+  const formulation = document.getElementById('pf_formulation').value.trim();
+  const reg = document.getElementById('pf_reg').value.trim();
+
+  if (!name || !category || !formulation || !reg) { showToast('请填写必填字段'); return; }
+
+  const ingredients = collectDynamicRows('ingredientsContainer', 'ingredient', true);
+  if (ingredients.length === 0) { showToast('请至少填写一个有效成分'); return; }
+
+  const data = {
+    name, category,
+    iconText: document.getElementById('pf_iconText').value.trim(),
+    formulation, registration_number: reg,
+    specification: document.getElementById('pf_spec').value.trim(),
+    active_ingredients: ingredients,
+    performance: document.getElementById('pf_performance').value.trim(),
+    key_points: collectDynamicRows('kpsContainer', 'kp', false),
+    usage_scope: {
+      crops: document.getElementById('pf_crops').value.trim(),
+      target: document.getElementById('pf_target').value.trim(),
+      dosage: document.getElementById('pf_dosage').value.trim(),
+      method: document.getElementById('pf_method').value.trim()
+    },
+    technical_requirements: document.getElementById('pf_tech').value.trim(),
+    status: document.getElementById('pf_status').value,
+  };
+
+  try {
+    if (editingProductId) {
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateProduct', id: editingProductId, data, adminKey } });
+    } else {
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateProduct', data, adminKey } });
+    }
+    closeModal('productModal');
+    await loadProducts();
+    renderAll();
+    showToast(editingProductId ? '产品已更新' : '产品已创建');
+  } catch(e) { showToast('操作失败: ' + (e.message || '')); console.error(e); }
+}
+
+async function deleteProduct(id, name) {
+  if (!confirm('确认删除产品"' + name + '"？\\n删除后用户将不可见。')) return;
+  try {
+    await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminDeleteProduct', id, adminKey } });
+    await loadProducts();
+    renderAll();
+    showToast('已删除');
+  } catch(e) { showToast('删除失败'); console.error(e); }
+}
+
+// ===== Category Form =====
+function openCategoryForm(id) {
+  editingCategoryId = id || null;
+  const cat = id ? categories.find(c => c._id === id) : null;
+  document.getElementById('categoryModalTitle').textContent = id ? '编辑分类' : '添加分类';
+
+  document.getElementById('categoryModalBody').innerHTML = `
+    <div class="field"><label>分类名称 *</label><input id="cf_name" value="${escAttr(cat ? cat.name : '')}"></div>
+    <div class="field"><label>单字图标</label><input id="cf_iconText" value="${escAttr(cat ? cat.iconText || '' : '')}" maxlength="1" placeholder="如：虫"></div>
+    <div class="field"><label>排序序号</label><input type="number" id="cf_sort" value="${cat ? (cat.sort || 0) : 0}"></div>
+    <div class="field"><label>启用状态</label><select id="cf_status">
+      <option value="active" ${cat && cat.status === 'active' ? 'selected' : ''}>启用</option>
+      <option value="inactive" ${!cat || cat.status !== 'active' ? 'selected' : ''}>禁用</option>
+    </select></div>`;
+
+  document.getElementById('categoryModal').classList.add('show');
+}
+
+async function saveCategory() {
+  const name = document.getElementById('cf_name').value.trim();
+  if (!name) { showToast('请填写分类名称'); return; }
+
+  const data = {
+    name,
+    iconText: document.getElementById('cf_iconText').value.trim(),
+    sort: parseInt(document.getElementById('cf_sort').value) || 0,
+    status: document.getElementById('cf_status').value
+  };
+
+  try {
+    if (editingCategoryId) {
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateCategory', id: editingCategoryId, data, adminKey } });
+    } else {
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateCategory', data, adminKey } });
+    }
+    closeModal('categoryModal');
+    await loadCategories();
+    renderAll();
+    showToast(editingCategoryId ? '分类已更新' : '分类已创建');
+  } catch(e) { showToast('操作失败: ' + (e.message || '')); console.error(e); }
+}
+
+// ===== Modal =====
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+  if (id === 'productModal') editingProductId = null;
+  if (id === 'categoryModal') editingCategoryId = null;
+}
+
+// ===== Helpers =====
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+}
+
+function statusLabel(s) {
+  if (s === 'deleted') return '已删除';
+  if (s === 'inactive') return '下架';
+  return '上架';
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escAttr(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('zh-CN') + ' ' + dt.toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+}
+</script>
+</body>
+</html>
