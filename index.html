@@ -626,7 +626,8 @@ async function deleteProduct(id, name) {
 
 // ===== Category Form =====
 function openCategoryForm(id) {
-  editingCategoryId = id || null;
+  editingCategoryId = id || null;  // 新建时确保为 null
+  console.log('openCategoryForm', { id, editingCategoryId });
   const cat = id ? categories.find(c => c._id === id) : null;
   document.getElementById('categoryModalTitle').textContent = id ? '编辑分类' : '添加分类';
 
