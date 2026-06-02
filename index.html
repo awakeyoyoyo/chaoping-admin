@@ -183,9 +183,11 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
     <div class="sub">产品与分类数据管理</div>
     <label>云环境 ID</label>
     <input type="text" id="envIdInput" placeholder="输入云环境ID，如 cloud-xxx">
-    <label>管理员密钥</label>
-    <input type="password" id="adminKeyInput" placeholder="输入管理员密钥">
-    <button class="btn" onclick="doLogin()">连接并验证</button>
+    <label>用户名</label>
+    <input type="text" id="usernameInput" placeholder="请输入用户名">
+    <label>密码</label>
+    <input type="password" id="passwordInput" placeholder="请输入密码">
+    <button class="btn" onclick="doLogin()">登录</button>
     <div class="error" id="loginError"></div>
   </div>
 </div>
@@ -247,7 +249,6 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
 // ===== State =====
 let app = null;
 let envId = '';
-let adminKey = '';
 let activeTab = 'products';
 let activeCategory = '全部';
 let products = [];
@@ -257,46 +258,34 @@ let editingCategoryId = null;
 
 // ===== Init =====
 document.getElementById('envIdInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
-document.getElementById('adminKeyInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('usernameInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('passwordInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
 // Restore saved config
 const savedEnvId = localStorage.getItem('cp_envId');
-const savedAdminKey = localStorage.getItem('cp_adminKey');
+const savedUsername = localStorage.getItem('cp_username');
 if (savedEnvId) document.getElementById('envIdInput').value = savedEnvId;
-if (savedAdminKey) document.getElementById('adminKeyInput').value = savedAdminKey;
+if (savedUsername) document.getElementById('usernameInput').value = savedUsername;
 
 // ===== Login =====
 async function doLogin() {
   const envInput = document.getElementById('envIdInput').value.trim();
-  const keyInput = document.getElementById('adminKeyInput').value.trim();
+  const username = document.getElementById('usernameInput').value.trim();
+  const password = document.getElementById('passwordInput').value.trim();
   const errEl = document.getElementById('loginError');
   errEl.textContent = '';
 
   if (!envInput) { errEl.textContent = '请输入云环境ID'; return; }
-  if (!keyInput) { errEl.textContent = '请输入管理员密钥'; return; }
+  if (!username) { errEl.textContent = '请输入用户名'; return; }
+  if (!password) { errEl.textContent = '请输入密码'; return; }
 
   try {
     app = cloudbase.init({ env: envInput });
-    await app.auth({ persistence: 'local' }).anonymousAuthProvider().signIn();
-
-    // Verify admin key
-    const resp = await app.callFunction({
-      name: 'quickstartFunctions',
-      data: { type: 'adminCheckAuth', adminKey: keyInput }
-    });
-    const result = resp.result || {};
-
-    if (!result.success || !result.isAdmin) {
-      errEl.textContent = result.errMsg || '密钥验证失败';
-      await app.auth().signOut();
-      app = null;
-      return;
-    }
+    await app.auth({ persistence: 'local' }).signInWithUsernameAndPassword(username, password);
 
     envId = envInput;
-    adminKey = keyInput;
     localStorage.setItem('cp_envId', envId);
-    localStorage.setItem('cp_adminKey', adminKey);
+    localStorage.setItem('cp_username', username);
 
     document.getElementById('loginOverlay').classList.add('hide');
     document.getElementById('app').classList.add('show');
@@ -304,16 +293,16 @@ async function doLogin() {
 
     await loadAll();
   } catch (e) {
-    errEl.textContent = '连接失败: ' + (e.message || '请检查环境ID和网络');
+    errEl.textContent = '登录失败: ' + (e.message || '用户名或密码错误');
     console.error(e);
   }
 }
 
 function doLogout() {
   localStorage.removeItem('cp_envId');
-  localStorage.removeItem('cp_adminKey');
+  localStorage.removeItem('cp_username');
   if (app) app.auth().signOut().catch(() => {});
-  app = null; envId = ''; adminKey = '';
+  app = null; envId = '';
   document.getElementById('loginOverlay').classList.remove('hide');
   document.getElementById('app').classList.remove('show');
 }
@@ -591,9 +580,9 @@ async function saveProduct() {
 
   try {
     if (editingProductId) {
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateProduct', id: editingProductId, data, adminKey } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateProduct', id: editingProductId, data } });
     } else {
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateProduct', data, adminKey } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateProduct', data } });
     }
     closeModal('productModal');
     await loadProducts();
@@ -605,7 +594,7 @@ async function saveProduct() {
 async function deleteProduct(id, name) {
   if (!confirm('确认删除产品"' + name + '"？\\n删除后用户将不可见。')) return;
   try {
-    await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminDeleteProduct', id, adminKey } });
+    await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminDeleteProduct', id } });
     await loadProducts();
     renderAll();
     showToast('已删除');
@@ -643,9 +632,9 @@ async function saveCategory() {
 
   try {
     if (editingCategoryId) {
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateCategory', id: editingCategoryId, data, adminKey } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateCategory', id: editingCategoryId, data } });
     } else {
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateCategory', data, adminKey } });
+      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateCategory', data } });
     }
     closeModal('categoryModal');
     await loadCategories();
