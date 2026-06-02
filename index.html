@@ -268,6 +268,32 @@ const savedUsername = localStorage.getItem('cp_username');
 if (savedEnvId) document.getElementById('envIdInput').value = savedEnvId;
 if (savedUsername) document.getElementById('usernameInput').value = savedUsername;
 
+async function restoreCurrentUid() {
+  const user = await app.auth().getCurrentUser();
+  uid = user && user.uid ? user.uid : '';
+  return uid;
+}
+
+async function ensureUid() {
+  if (uid) return uid;
+  const restoredUid = await restoreCurrentUid();
+  if (!restoredUid) throw new Error('登录状态已失效，请重新登录');
+  return restoredUid;
+}
+
+async function callAdminFunction(data) {
+  const clientUid = await ensureUid();
+  const resp = await app.callFunction({
+    name: 'quickstartFunctions',
+    data: { ...data, clientUid }
+  });
+  const result = resp.result || {};
+  if (!result.success) {
+    throw new Error(result.errMsg || '操作失败');
+  }
+  return result.data;
+}
+
 // 自动恢复登录状态
 if (savedEnvId) {
   (async () => {
@@ -276,6 +302,8 @@ if (savedEnvId) {
       const loginState = await app.auth({ persistence: 'local' }).getLoginState();
       if (loginState && loginState.user) {
         envId = savedEnvId;
+        uid = loginState.user.uid || await restoreCurrentUid();
+        console.log('restored uid:', uid);
         document.getElementById('loginOverlay').classList.add('hide');
         document.getElementById('app').classList.add('show');
         document.getElementById('envDisplay').textContent = '环境: ' + envId;
@@ -304,8 +332,7 @@ async function doLogin() {
     await app.auth({ persistence: 'local' }).signInWithUsernameAndPassword(username, password);
 
     // 获取用户 UID
-    const user = await app.auth().getCurrentUser();
-    uid = user && user.uid ? user.uid : '';
+    await restoreCurrentUid();
     console.log('login uid:', uid);
 
     envId = envInput;
@@ -608,10 +635,10 @@ async function saveProduct() {
   try {
     if (editingProductId) {
       console.log('→ adminUpdateProduct');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateProduct', clientUid: uid, id: editingProductId, data } });
+      await callAdminFunction({ type: 'adminUpdateProduct', id: editingProductId, data });
     } else {
       console.log('→ adminCreateProduct');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateProduct', clientUid: uid, data } });
+      await callAdminFunction({ type: 'adminCreateProduct', data });
     }
     closeModal('productModal');
     await loadProducts();
@@ -623,7 +650,7 @@ async function saveProduct() {
 async function deleteProduct(id, name) {
   if (!confirm('确认删除产品"' + name + '"？\\n删除后用户将不可见。')) return;
   try {
-    await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminDeleteProduct', clientUid: uid, id } });
+    await callAdminFunction({ type: 'adminDeleteProduct', id });
     await loadProducts();
     renderAll();
     showToast('已删除');
@@ -665,10 +692,10 @@ async function saveCategory() {
   try {
     if (editingCategoryId) {
       console.log('→ adminUpdateCategory');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminUpdateCategory', clientUid: uid, id: editingCategoryId, data } });
+      await callAdminFunction({ type: 'adminUpdateCategory', id: editingCategoryId, data });
     } else {
       console.log('→ adminCreateCategory');
-      await app.callFunction({ name: 'quickstartFunctions', data: { type: 'adminCreateCategory', clientUid: uid, data } });
+      await callAdminFunction({ type: 'adminCreateCategory', data });
     }
     closeModal('categoryModal');
     await loadCategories();
