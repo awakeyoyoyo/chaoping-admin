@@ -87,6 +87,12 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
   color:#fff; font-size:14px; font-weight:600; cursor:pointer;
 }
 .content-header .add-btn:hover { opacity:0.9; }
+.content-header .header-actions { display:flex; gap:10px; align-items:center; }
+.content-header .secondary-btn {
+  padding:10px 18px; border:1px solid #dce9dd; border-radius:20px; background:#fff;
+  color:#536453; font-size:13px; font-weight:600; cursor:pointer;
+}
+.content-header .secondary-btn:hover { background:#f6faf6; }
 
 /* Product cards */
 .product-grid { display:flex; flex-direction:column; gap:12px; }
@@ -132,6 +138,32 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
 .cat-card .cat-info .cat-name { font-size:16px; font-weight:600; }
 .cat-card .cat-info .cat-meta { font-size:12px; color:#708070; margin-top:2px; }
 .cat-card .edit-btn { padding:6px 16px; border:1px solid #bfe4c7; border-radius:14px; background:#fff; color:#2f8a42; cursor:pointer; font-size:12px; }
+
+/* Banner management */
+.banner-upload-card {
+  display:flex; align-items:center; justify-content:space-between; gap:18px;
+  margin-bottom:18px; padding:18px 20px; border:2px dashed #c8dcc8;
+  border-radius:18px; background:#fff;
+}
+.banner-upload-card input { flex:1; }
+.banner-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px; }
+.banner-card {
+  padding:16px; border-radius:18px; background:#fff;
+  box-shadow:0 4px 16px rgba(34,96,51,0.06);
+}
+.banner-preview {
+  display:flex; align-items:center; justify-content:center;
+  width:100%; height:150px; border-radius:14px; background:#f6faf4;
+  color:#2f8a42; font-weight:700; overflow:hidden; border:1px solid #edf2ed;
+}
+.banner-preview img { width:100%; height:100%; object-fit:contain; background:#fff; }
+.banner-meta { margin-top:12px; color:#708070; font-size:12px; line-height:1.7; word-break:break-all; }
+.banner-actions { display:flex; justify-content:flex-end; margin-top:12px; }
+.banner-actions .del-btn {
+  padding:7px 16px; border:1px solid #fce4e4; border-radius:14px;
+  background:#fff; color:#d32f2f; cursor:pointer; font-size:12px;
+}
+.banner-actions .del-btn:hover { background:#fef5f5; }
 
 /* Modal */
 .modal-mask {
@@ -235,10 +267,12 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
       <div class="sidebar-nav">
         <div class="nav-item active" data-tab="products" onclick="switchTab('products')">产品</div>
         <div class="nav-item" data-tab="categories" onclick="switchTab('categories')">分类</div>
+        <div class="nav-item" data-tab="banners" onclick="switchTab('banners')">轮播</div>
       </div>
       <!-- Product sidebar: category filter -->
       <div id="productSidebar" class="sidebar-list"></div>
       <div id="categorySidebar" class="sidebar-list" style="display:none;"></div>
+      <div id="bannerSidebar" class="sidebar-list" style="display:none;"></div>
       <button id="sidebarAddBtn" class="sidebar-add" onclick="onSidebarAdd()">+ 添加</button>
     </div>
     <!-- Content -->
@@ -282,6 +316,7 @@ let activeTab = 'products';
 let activeCategory = '全部';
 let products = [];
 let categories = [];
+let banners = [];
 let editingProductId = null;
 let editingCategoryId = null;
 let selectedProductImageFile = null;
@@ -405,7 +440,7 @@ function doLogout() {
 
 // ===== Load =====
 async function loadAll() {
-  await Promise.all([loadProducts(), loadCategories()]);
+  await Promise.all([loadProducts(), loadCategories(), loadBanners()]);
   renderAll();
 }
 
@@ -455,6 +490,25 @@ async function loadCategories() {
   } catch(e) { console.error('loadCategories', e); categories = []; }
 }
 
+async function loadBanners() {
+  try {
+    const resp = await app.callFunction({
+      name: 'quickstartFunctions',
+      data: { type: 'getBanners', includeInactive: true }
+    });
+    banners = (resp.result && resp.result.success) ? (resp.result.data || []) : [];
+    await attachBannerImageUrls();
+  } catch(e) { console.error('loadBanners', e); banners = []; }
+}
+
+async function attachBannerImageUrls() {
+  const fileIDs = banners.map(b => b.fileID).filter(Boolean);
+  const urls = await getTempFileURLs(fileIDs);
+  const urlMap = {};
+  fileIDs.forEach((fileID, idx) => { if (urls[idx]) urlMap[fileID] = urls[idx]; });
+  banners = banners.map(b => ({ ...b, imageUrl: urlMap[b.fileID] || '' }));
+}
+
 // ===== Tab Switch =====
 function switchTab(tab) {
   activeTab = tab;
@@ -469,10 +523,12 @@ function switchTab(tab) {
 function renderAll() {
   renderSidebar();
   renderContent();
-  document.getElementById('sidebarAddBtn').textContent = activeTab === 'products' ? '+ 添加产品' : '+ 添加分类';
-  document.getElementById('sidebarAddBtn').onclick = activeTab === 'products' ? () => openProductForm() : () => openCategoryForm();
+  const addBtn = document.getElementById('sidebarAddBtn');
+  addBtn.textContent = activeTab === 'products' ? '+ 添加产品' : activeTab === 'categories' ? '+ 添加分类' : '+ 上传轮播';
+  addBtn.onclick = activeTab === 'products' ? () => openProductForm() : activeTab === 'categories' ? () => openCategoryForm() : () => triggerBannerUpload();
   document.getElementById('productSidebar').style.display = activeTab === 'products' ? '' : 'none';
   document.getElementById('categorySidebar').style.display = activeTab === 'categories' ? '' : 'none';
+  document.getElementById('bannerSidebar').style.display = activeTab === 'banners' ? '' : 'none';
 }
 
 function renderSidebar() {
@@ -493,6 +549,13 @@ function renderSidebar() {
     });
     document.getElementById('productSidebar').innerHTML = html;
   } else {
+    if (activeTab === 'banners') {
+      const activeBanners = banners.filter(b => b.status !== 'deleted');
+      document.getElementById('bannerSidebar').innerHTML = `<div class="sidebar-item active">
+        <span>首页轮播</span><span class="count">${activeBanners.length}</span></div>`;
+      return;
+    }
+
     let html = '';
     categories.forEach(c => {
       html += `<div class="sidebar-item ${activeCategory === c._id ? 'active' : ''}" onclick="selectCategoryItem('${c._id}')">
@@ -529,7 +592,8 @@ function getSelectedProductCategories() {
 
 function onSidebarAdd() {
   if (activeTab === 'products') openProductForm();
-  else openCategoryForm();
+  else if (activeTab === 'categories') openCategoryForm();
+  else triggerBannerUpload();
 }
 
 function renderContent() {
@@ -539,7 +603,10 @@ function renderContent() {
 
     let html = `<div class="content-header">
       <h3>${activeCategory} <span style="font-size:14px;color:#708070;font-weight:400;">(${filtered.length}个)</span></h3>
-      <button class="add-btn" onclick="openProductForm()">+ 添加产品</button></div>`;
+      <div class="header-actions">
+        <button class="secondary-btn" onclick="cleanupLegacyProductFields()">清理旧数据</button>
+        <button class="add-btn" onclick="openProductForm()">+ 添加产品</button>
+      </div></div>`;
 
     if (filtered.length === 0) {
       html += '<div class="empty">暂无产品数据</div>';
@@ -557,13 +624,49 @@ function renderContent() {
             <div class="name">${escHtml(p.name)} <span class="status-badge ${p.status || 'active'}">${statusLabel(p.status)}</span></div>
             <div class="ingredient">${escHtml(ingText)}</div>
             <div class="meta">分类：${escHtml(categoryText)}</div>
-            <div class="meta">剂型：${escHtml(p.formulation || '待补充')} | 登记号：${escHtml(p.registration_number || '待补充')}</div>
+            <div class="meta">剂型：${escHtml(p.formulation || '待补充')}</div>
             <div class="spec">规格：${escHtml(p.specification || '待补充')}</div>
           </div>
           <div class="product-actions">
             <button class="edit-btn" onclick="openProductForm('${p._id}')">编辑</button>
             <button class="del-btn" onclick="deleteProduct('${p._id}','${escHtml(p.name)}')">删除</button>
           </div></div>`;
+      });
+      html += '</div>';
+    }
+    area.innerHTML = html;
+  } else if (activeTab === 'banners') {
+    const activeBanners = banners.filter(b => b.status !== 'deleted');
+    let html = `<div class="content-header">
+      <h3>首页轮播 <span style="font-size:14px;color:#708070;font-weight:400;">(${activeBanners.length}张)</span></h3>
+      <button class="add-btn" onclick="triggerBannerUpload()">+ 上传轮播图</button></div>
+      <div class="banner-upload-card">
+        <div>
+          <div style="font-weight:700;margin-bottom:4px;">新增轮播图</div>
+          <div style="font-size:12px;color:#708070;">选择图片后会上传到当前云环境，并立即加入首页轮播。</div>
+        </div>
+        <input id="bannerImageInput" type="file" accept="image/*" onchange="onBannerImageChange(event)">
+      </div>`;
+
+    if (activeBanners.length === 0) {
+      html += '<div class="empty">暂无轮播图，请先上传图片</div>';
+    } else {
+      html += '<div class="banner-grid">';
+      activeBanners.forEach((banner, index) => {
+        const previewHtml = banner.imageUrl
+          ? `<img src="${escAttr(banner.imageUrl)}" alt="轮播图${index + 1}">`
+          : '轮播图';
+        html += `<div class="banner-card">
+          <div class="banner-preview">${previewHtml}</div>
+          <div class="banner-meta">
+            <div>排序：${banner.sort || 0}</div>
+            <div>创建时间：${fmtDate(banner.create_time)}</div>
+            <div>fileID：${escHtml(banner.fileID || '')}</div>
+          </div>
+          <div class="banner-actions">
+            <button class="del-btn" onclick="deleteBanner('${banner._id}')">删除</button>
+          </div>
+        </div>`;
       });
       html += '</div>';
     }
@@ -629,7 +732,6 @@ function openProductForm(id) {
       <div class="field"><label>单字图标</label><input id="pf_iconText" value="${escAttr(product ? product.iconText || '' : '')}" maxlength="1" placeholder="如：菌"></div>
       <div class="field"><label>剂型 *</label><input id="pf_formulation" value="${escAttr(product ? product.formulation || '' : '')}" placeholder="如：微乳剂"></div>
     </div>
-    <div class="field"><label>登记号 *</label><input id="pf_reg" value="${escAttr(product ? product.registration_number || '' : '')}" placeholder="如：PD20260826"></div>
     <div class="field"><label>录入厂家</label><input id="pf_manufacturer" value="${escAttr(product ? product.manufacturer || '' : '')}" placeholder="如：广东朝平农业科技有限公司"></div>
     <div class="field"><label>规格</label><input id="pf_spec" value="${escAttr(product ? product.specification || '' : '')}" placeholder="如：100毫升*50瓶"></div>
     <div class="field"><label>有效成分 *</label>
@@ -794,9 +896,8 @@ async function saveProduct() {
   const categoriesValue = getSelectedProductCategories();
   const category = categoriesValue[0] || '';
   const formulation = document.getElementById('pf_formulation').value.trim();
-  const reg = document.getElementById('pf_reg').value.trim();
 
-  if (!name || !category || !formulation || !reg) { showToast('请填写必填字段'); return; }
+  if (!name || !category || !formulation) { showToast('请填写必填字段'); return; }
 
   const ingredients = collectDynamicRows('ingredientsContainer', 'ingredient', true);
   if (ingredients.length === 0) { showToast('请至少填写一个有效成分'); return; }
@@ -814,7 +915,7 @@ async function saveProduct() {
     name, category,
     categories: categoriesValue,
     iconText: document.getElementById('pf_iconText').value.trim(),
-    formulation, registration_number: reg,
+    formulation,
     manufacturer: document.getElementById('pf_manufacturer').value.trim(),
     specification: document.getElementById('pf_spec').value.trim(),
     active_ingredients: ingredients,
@@ -850,6 +951,72 @@ async function deleteProduct(id, name) {
     renderAll();
     showToast('已删除');
   } catch(e) { showToast('删除失败'); console.error(e); }
+}
+
+async function cleanupLegacyProductFields() {
+  if (!confirm('确认清理旧产品数据字段？\\n清理后不影响产品名称、图片、分类、剂型和规格。')) return;
+  try {
+    const result = await callAdminFunction({ type: 'adminClearProductLegacyFields' });
+    await loadProducts();
+    renderAll();
+    const updated = result && typeof result.updated === 'number' ? result.updated : 0;
+    showToast(`旧数据已清理，更新 ${updated} 条`);
+  } catch(e) {
+    console.error('cleanup legacy product fields error:', e);
+    showToast('清理失败: ' + (e.message || ''));
+  }
+}
+
+// ===== Banner Management =====
+function triggerBannerUpload() {
+  const input = document.getElementById('bannerImageInput');
+  if (input) input.click();
+}
+
+async function onBannerImageChange(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  try {
+    const timestamp = Date.now();
+    const cloudPath = `banner/${timestamp}-${sanitizeFileName(file.name)}`;
+    const upload = await app.uploadFile({
+      cloudPath,
+      filePath: file,
+    });
+    const fileID = upload && upload.fileID ? upload.fileID : '';
+    if (!fileID) {
+      showToast('轮播图上传失败');
+      return;
+    }
+
+    const nextSort = banners.filter(b => b.status !== 'deleted').length + 1;
+    await callAdminFunction({
+      type: 'adminCreateBanner',
+      data: { fileID, sort: nextSort, status: 'active' },
+    });
+    await loadBanners();
+    renderAll();
+    showToast('轮播图已添加');
+  } catch(e) {
+    console.error('save banner error:', e);
+    showToast('轮播图保存失败: ' + (e.message || ''));
+  } finally {
+    event.target.value = '';
+  }
+}
+
+async function deleteBanner(id) {
+  if (!confirm('确认删除这张轮播图？\\n删除后首页将不再展示。')) return;
+  try {
+    await callAdminFunction({ type: 'adminDeleteBanner', id });
+    await loadBanners();
+    renderAll();
+    showToast('轮播图已删除');
+  } catch(e) {
+    console.error('delete banner error:', e);
+    showToast('删除失败: ' + (e.message || ''));
+  }
 }
 
 // ===== Category Form =====
