@@ -107,11 +107,12 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
 }
 .product-thumb {
   width:80px; height:80px; border-radius:18px; object-fit:contain;
-  background:#f6faf4; border:1px solid #edf2ed; flex-shrink:0;
+  background:#ffffff; border:1px solid #edf2ed; flex-shrink:0;
 }
 .product-info { flex:1; min-width:0; }
 .product-info .name { font-size:17px; font-weight:700; }
 .product-info .ingredient { color:#536453; font-size:13px; margin-top:4px; }
+.product-info .ingredient .ingredient-separator { margin:0 6px; color:#17351f; font-weight:800; }
 .product-info .meta { color:#708070; font-size:12px; margin-top:4px; }
 .product-info .spec { color:#8a6a2a; font-size:12px; margin-top:4px; padding-top:4px; border-top:1px solid #edf2ed; }
 .product-actions { display:flex; flex-direction:column; gap:8px; flex-shrink:0; }
@@ -138,6 +139,9 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
 .cat-card .cat-info .cat-name { font-size:16px; font-weight:600; }
 .cat-card .cat-info .cat-meta { font-size:12px; color:#708070; margin-top:2px; }
 .cat-card .edit-btn { padding:6px 16px; border:1px solid #bfe4c7; border-radius:14px; background:#fff; color:#2f8a42; cursor:pointer; font-size:12px; }
+.cat-card .cat-actions { display:flex; gap:8px; flex-shrink:0; }
+.cat-card .del-btn { padding:6px 16px; border:1px solid #fce4e4; border-radius:14px; background:#fff; color:#d32f2f; cursor:pointer; font-size:12px; }
+.cat-card .del-btn:hover { background:#fef5f5; }
 
 /* Banner management */
 .banner-upload-card {
@@ -153,10 +157,10 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
 }
 .banner-preview {
   display:flex; align-items:center; justify-content:center;
-  width:100%; height:150px; border-radius:14px; background:#f6faf4;
+  width:100%; height:150px; border-radius:14px; background:#ffffff;
   color:#2f8a42; font-weight:700; overflow:hidden; border:1px solid #edf2ed;
 }
-.banner-preview img { width:100%; height:100%; object-fit:contain; background:#fff; }
+.banner-preview img { width:100%; height:100%; object-fit:contain; background:#ffffff; }
 .banner-meta { margin-top:12px; color:#708070; font-size:12px; line-height:1.7; word-break:break-all; }
 .banner-actions { display:flex; justify-content:flex-end; margin-top:12px; }
 .banner-actions .del-btn {
@@ -188,7 +192,8 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
 .modal-body .row { display:flex; gap:12px; }
 .modal-body .row .field { flex:1; }
 .modal-body .dynamic-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-.modal-body .dynamic-row input { flex:1; }
+.modal-body .dynamic-row input,
+.modal-body .dynamic-row textarea { flex:1; }
 .modal-body .dynamic-row .rm-btn {
   width:28px; height:28px; border:none; border-radius:50%; background:#fce4e4; color:#d32f2f;
   cursor:pointer; font-size:14px; line-height:28px; text-align:center; flex-shrink:0;
@@ -202,10 +207,38 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
   width:96px; height:96px; border-radius:16px; background:#e5f3e7; color:#2f8a42;
   font-size:32px; font-weight:700; overflow:hidden; flex-shrink:0;
 }
-.image-preview img { width:100%; height:100%; object-fit:contain; background:#fff; }
+.image-preview img { width:100%; height:100%; object-fit:contain; background:#ffffff; }
 .image-upload-actions { flex:1; min-width:0; }
 .image-upload-actions input { margin:0 0 8px; }
 .image-upload-hint { color:#708070; font-size:12px; line-height:1.5; }
+.product-image-manager {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:12px;
+  margin-top:12px;
+}
+.product-image-item {
+  position:relative; padding:8px; border:1px solid #edf2ed; border-radius:14px;
+  background:#fff;
+}
+.product-image-item.main { border-color:#2f8a42; box-shadow:0 0 0 2px rgba(47,138,66,0.08); }
+.product-image-item-preview {
+  display:flex; align-items:center; justify-content:center; width:100%; height:92px;
+  border-radius:10px; background:#ffffff; color:#2f8a42; font-weight:700; overflow:hidden;
+}
+.product-image-item-preview img { width:100%; height:100%; object-fit:contain; background:#ffffff; }
+.product-image-badge {
+  position:absolute; top:12px; left:12px; padding:2px 7px; border-radius:999px;
+  background:#2f8a42; color:#fff; font-size:11px; font-weight:700;
+}
+.product-image-item-actions { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+.product-image-item-actions button {
+  flex:1 0 auto; min-width:44px; padding:4px 6px; border:1px solid #dce9dd;
+  border-radius:8px; background:#fff; color:#536453; font-size:11px; cursor:pointer;
+}
+.product-image-item-actions .danger { color:#d32f2f; border-color:#fce4e4; }
+.product-image-empty {
+  padding:14px; border:1px dashed #c8dcc8; border-radius:12px; color:#708070;
+  font-size:12px; text-align:center; background:#f9fbf9;
+}
 .category-checkbox-grid {
   display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px;
 }
@@ -319,7 +352,10 @@ let categories = [];
 let banners = [];
 let editingProductId = null;
 let editingCategoryId = null;
-let selectedProductImageFile = null;
+let productImageItems = [];
+let productImageItemSeq = 0;
+let editingProductOriginalMainFileID = '';
+let editingProductOriginalCoverThumb = '';
 
 // ===== Init =====
 document.getElementById('envIdInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
@@ -613,7 +649,10 @@ function renderContent() {
     } else {
       html += '<div class="product-grid">';
       filtered.forEach(p => {
-        const ingText = (p.active_ingredients || []).map(i => i.name + (i.concentration || '')).join(' + ') || '成分待补充';
+        const ingText = (p.active_ingredients || [])
+          .map(i => escHtml(i.name + (i.concentration || '')))
+          .filter(Boolean)
+          .join('<strong class="ingredient-separator">·</strong>') || '成分待补充';
         const categoryText = getProductCategories(p).join('、') || '未分类';
         const imageHtml = p.imageUrl
           ? `<img class="product-thumb" src="${escAttr(p.imageUrl)}" alt="${escAttr(p.name)}">`
@@ -622,7 +661,7 @@ function renderContent() {
           ${imageHtml}
           <div class="product-info">
             <div class="name">${escHtml(p.name)} <span class="status-badge ${p.status || 'active'}">${statusLabel(p.status)}</span></div>
-            <div class="ingredient">${escHtml(ingText)}</div>
+            <div class="ingredient">${ingText}</div>
             <div class="meta">分类：${escHtml(categoryText)}</div>
             <div class="meta">剂型：${escHtml(p.formulation || '待补充')}</div>
             <div class="spec">规格：${escHtml(p.specification || '待补充')}</div>
@@ -686,7 +725,10 @@ function renderContent() {
             <div class="cat-name">${escHtml(c.iconText || '📦')} ${escHtml(c.name)} <span class="status-badge ${c.status || 'active'}">${statusLabel(c.status)}</span></div>
             <div class="cat-meta">排序：${c.sort || 0} | 更新时间：${fmtDate(c.update_time)}</div>
           </div>
-          <button class="edit-btn" onclick="openCategoryForm('${c._id}')">编辑</button></div>`;
+          <div class="cat-actions">
+            <button class="edit-btn" onclick="openCategoryForm('${c._id}')">编辑</button>
+            <button class="del-btn" onclick="deleteCategory('${c._id}','${escAttr(c.name)}')">删除分类</button>
+          </div></div>`;
       });
       html += '</div>';
     }
@@ -697,8 +739,10 @@ function renderContent() {
 // ===== Product Form =====
 function openProductForm(id) {
   editingProductId = id || null;
-  selectedProductImageFile = null;
   const product = id ? products.find(p => p._id === id) : null;
+  productImageItems = buildProductImageItems(product);
+  editingProductOriginalMainFileID = productImageItems.length ? productImageItems[0].fileID || '' : '';
+  editingProductOriginalCoverThumb = product ? (product.coverThumb || product.thumbnail || product.thumbImage || product.cover_thumb || '') : '';
   document.getElementById('productModalTitle').textContent = id ? '编辑产品' : '添加产品';
 
   const selectedCategories = getProductCategories(product || {});
@@ -710,21 +754,15 @@ function openProductForm(id) {
   const ingredients = (product && product.active_ingredients && product.active_ingredients.length)
     ? product.active_ingredients : [{ name: '', concentration: '' }];
   const kps = (product && product.key_points && product.key_points.length) ? product.key_points : [];
-  const imageFileID = product && Array.isArray(product.images) && product.images.length ? product.images[0] : '';
-  const thumbFileID = product ? (product.coverThumb || product.thumbnail || product.thumbImage || product.cover_thumb || '') : '';
-  const imagePreview = product && product.imageUrl ? `<img src="${escAttr(product.imageUrl)}" alt="产品图片">` : (product ? product.iconText || '图' : '图');
-
   let html = `
-    <div class="field"><label>产品图片</label>
+    <div class="field"><label>产品图片（第一张为列表展示图）</label>
       <div class="image-upload-card">
-        <div class="image-preview" id="productImagePreview">${imagePreview}</div>
         <div class="image-upload-actions">
-          <input id="pf_image" type="file" accept="image/*" onchange="onProductImageChange(event)">
-          <input id="pf_existing_image" type="hidden" value="${escAttr(imageFileID)}">
-          <input id="pf_existing_thumb" type="hidden" value="${escAttr(thumbFileID)}">
-          <div class="image-upload-hint">上传后将自动生成列表缩略图，详情页使用原图。未选择新图片时会保留原图片。</div>
+          <input id="pf_images" type="file" accept="image/*" multiple onchange="onProductImagesChange(event)">
+          <div class="image-upload-hint">可一次选择多张图片。第一张会生成列表/搜索缩略图，详情页可左右滑动查看全部图片。</div>
         </div>
       </div>
+      <div id="productImageManager">${renderProductImageManager()}</div>
     </div>
     <div class="field"><label>产品名称 *</label><input id="pf_name" value="${escAttr(product ? product.name : '')}"></div>
     <div class="field"><label>分类 *（可多选）</label><div class="category-checkbox-grid">${catOptions}</div></div>
@@ -750,18 +788,106 @@ function openProductForm(id) {
 
   document.getElementById('productModalBody').innerHTML = html;
   document.getElementById('productModal').classList.add('show');
+  hydrateProductImageItemPreviews();
 }
 
-function onProductImageChange(event) {
-  const file = event.target.files && event.target.files[0];
-  selectedProductImageFile = file || null;
-  if (!file) return;
+function buildProductImageItems(product) {
+  const images = product && Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+  return images.map((fileID, index) => ({
+    id: `existing-${Date.now()}-${index}-${productImageItemSeq++}`,
+    type: 'existing',
+    fileID,
+    previewUrl: index === 0 && product && product.imageUrl ? product.imageUrl : '',
+  }));
+}
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    document.getElementById('productImagePreview').innerHTML = `<img src="${escAttr(reader.result)}" alt="产品图片预览">`;
-  };
-  reader.readAsDataURL(file);
+function renderProductImageManager() {
+  if (!productImageItems.length) {
+    return '<div class="product-image-empty">暂无产品图片，请选择图片上传</div>';
+  }
+
+  return `<div class="product-image-manager">${productImageItems.map((item, index) => {
+    const previewHtml = item.previewUrl
+      ? `<img src="${escAttr(item.previewUrl)}" alt="产品图片${index + 1}">`
+      : '图';
+    return `<div class="product-image-item ${index === 0 ? 'main' : ''}" data-id="${escAttr(item.id)}">
+      ${index === 0 ? '<div class="product-image-badge">首图</div>' : ''}
+      <div class="product-image-item-preview">${previewHtml}</div>
+      <div class="product-image-item-actions">
+        <button type="button" onclick="setProductImageAsMain('${item.id}')">设首图</button>
+        <button type="button" onclick="moveProductImageItem('${item.id}', -1)">上移</button>
+        <button type="button" onclick="moveProductImageItem('${item.id}', 1)">下移</button>
+        <button type="button" class="danger" onclick="removeProductImageItem('${item.id}')">删除</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function refreshProductImageManager() {
+  const manager = document.getElementById('productImageManager');
+  if (manager) {
+    manager.innerHTML = renderProductImageManager();
+  }
+}
+
+async function hydrateProductImageItemPreviews() {
+  const fileIDs = productImageItems
+    .filter(item => item.type === 'existing' && item.fileID && !item.previewUrl)
+    .map(item => item.fileID);
+  if (!fileIDs.length) return;
+
+  try {
+    const urls = await getTempFileURLs(fileIDs);
+    let urlIndex = 0;
+    productImageItems = productImageItems.map(item => {
+      if (item.type !== 'existing' || item.previewUrl) return item;
+      const previewUrl = urls[urlIndex++] || '';
+      return { ...item, previewUrl };
+    });
+    refreshProductImageManager();
+  } catch (e) {
+    console.warn('load product image previews failed', e);
+  }
+}
+
+function onProductImagesChange(event) {
+  const files = Array.from(event.target.files || []);
+  files.forEach(file => {
+    productImageItems.push({
+      id: `new-${Date.now()}-${productImageItemSeq++}`,
+      type: 'new',
+      file,
+      previewUrl: URL.createObjectURL(file),
+    });
+  });
+  event.target.value = '';
+  refreshProductImageManager();
+}
+
+function removeProductImageItem(id) {
+  productImageItems = productImageItems.filter(item => item.id !== id);
+  refreshProductImageManager();
+}
+
+function moveProductImageItem(id, direction) {
+  const index = productImageItems.findIndex(item => item.id === id);
+  const nextIndex = index + direction;
+  if (index < 0 || nextIndex < 0 || nextIndex >= productImageItems.length) return;
+  const nextItems = [...productImageItems];
+  const [item] = nextItems.splice(index, 1);
+  nextItems.splice(nextIndex, 0, item);
+  productImageItems = nextItems;
+  refreshProductImageManager();
+}
+
+function setProductImageAsMain(id) {
+  const index = productImageItems.findIndex(item => item.id === id);
+  if (index <= 0) return;
+  const nextItems = [...productImageItems];
+  const [item] = nextItems.splice(index, 1);
+  nextItems.unshift(item);
+  productImageItems = nextItems;
+  refreshProductImageManager();
 }
 
 function sanitizeFileName(name) {
@@ -780,6 +906,8 @@ function createProductThumbnailFile(file) {
       canvas.width = Math.max(1, Math.round(image.width * scale));
       canvas.height = Math.max(1, Math.round(image.height * scale));
       const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
         if (!blob) {
@@ -799,49 +927,75 @@ function createProductThumbnailFile(file) {
 }
 
 async function uploadProductImageIfNeeded() {
-  if (!selectedProductImageFile) {
-    const existingImage = document.getElementById('pf_existing_image');
-    const existingThumb = document.getElementById('pf_existing_thumb');
-    return {
-      images: existingImage && existingImage.value ? [existingImage.value] : [],
-      coverThumb: existingThumb && existingThumb.value ? existingThumb.value : '',
-    };
-  }
-
-  const timestamp = Date.now();
-  const safeName = sanitizeFileName(selectedProductImageFile.name);
-  const cloudPath = `products/images/${timestamp}-${safeName}`;
-  const fullUpload = await app.uploadFile({
-    cloudPath,
-    filePath: selectedProductImageFile,
-  });
-  const fullFileID = fullUpload && fullUpload.fileID ? fullUpload.fileID : '';
-  if (!fullFileID) {
+  if (!productImageItems.length) {
     return { images: [], coverThumb: '' };
   }
 
-  let thumbFile;
-  try {
-    thumbFile = await createProductThumbnailFile(selectedProductImageFile);
-  } catch (e) {
-    console.warn('create product thumbnail failed, fallback to full image', e);
-    thumbFile = selectedProductImageFile;
+  const timestamp = Date.now();
+  const uploadedItems = [];
+  for (let index = 0; index < productImageItems.length; index += 1) {
+    const item = productImageItems[index];
+    if (item.type === 'existing') {
+      uploadedItems.push(item);
+      continue;
+    }
+
+    const safeName = sanitizeFileName(item.file && item.file.name ? item.file.name : `product-${index}.jpg`);
+    const upload = await app.uploadFile({
+      cloudPath: `products/images/${timestamp}-${index}-${safeName}`,
+      filePath: item.file,
+    });
+    const fileID = upload && upload.fileID ? upload.fileID : '';
+    if (fileID) {
+      uploadedItems.push({ ...item, type: 'existing', fileID });
+    }
   }
 
-  const thumbUpload = await app.uploadFile({
-    cloudPath: `products/thumbs/${timestamp}-${sanitizeFileName(thumbFile.name || safeName)}`,
-    filePath: thumbFile,
-  });
+  const images = uploadedItems.map(item => item.fileID).filter(Boolean);
+  if (!images.length) {
+    return { images: [], coverThumb: '' };
+  }
+
+  const mainItem = uploadedItems[0];
+  if (
+    mainItem.type === 'existing' &&
+    mainItem.fileID === editingProductOriginalMainFileID &&
+    editingProductOriginalCoverThumb
+  ) {
+    return { images, coverThumb: editingProductOriginalCoverThumb };
+  }
+
+  let coverThumb = mainItem.fileID;
+  if (mainItem.file) {
+    let thumbFile;
+    try {
+      thumbFile = await createProductThumbnailFile(mainItem.file);
+    } catch (e) {
+      console.warn('create product thumbnail failed, fallback to full image', e);
+      thumbFile = mainItem.file;
+    }
+
+    const thumbUpload = await app.uploadFile({
+      cloudPath: `products/thumbs/${timestamp}-${sanitizeFileName(thumbFile.name || 'main-thumb.jpg')}`,
+      filePath: thumbFile,
+    });
+    coverThumb = thumbUpload && thumbUpload.fileID ? thumbUpload.fileID : mainItem.fileID;
+  }
 
   return {
-    images: [fullFileID],
-    coverThumb: thumbUpload && thumbUpload.fileID ? thumbUpload.fileID : fullFileID,
+    images,
+    coverThumb,
   };
 }
 
 function renderDynamicRows(items, prefix, placeholder1, placeholder2) {
   return items.map((item, i) => {
     if (typeof item === 'string') {
+      if (prefix === 'kp') {
+        return `<div class="dynamic-row">
+        <textarea data-prefix="${prefix}" data-idx="${i}" data-sub="value" placeholder="${placeholder1}">${escHtml(item)}</textarea>
+        <div class="rm-btn" onclick="removeDynamicRow(this,'${prefix}')">✕</div></div>`;
+      }
       return `<div class="dynamic-row">
         <input value="${escAttr(item)}" data-prefix="${prefix}" data-idx="${i}" data-sub="value" placeholder="${placeholder1}">
         <div class="rm-btn" onclick="removeDynamicRow(this,'${prefix}')">✕</div></div>`;
@@ -863,7 +1017,7 @@ function addDynamicRow(containerId, prefix, defaultValue) {
       <input data-prefix="${prefix}" data-idx="${idx}" data-sub="concentration" placeholder="浓度">
       <div class="rm-btn" onclick="removeDynamicRow(this,'${prefix}')">✕</div>`;
   } else {
-    div.innerHTML = `<input data-prefix="${prefix}" data-idx="${idx}" data-sub="value" placeholder="特点描述">
+    div.innerHTML = `<textarea data-prefix="${prefix}" data-idx="${idx}" data-sub="value" placeholder="特点描述"></textarea>
       <div class="rm-btn" onclick="removeDynamicRow(this,'${prefix}')">✕</div>`;
   }
   container.appendChild(div);
@@ -878,7 +1032,7 @@ function collectDynamicRows(containerId, prefix, isObject) {
   const rows = container.querySelectorAll('.dynamic-row');
   const result = [];
   rows.forEach(row => {
-    const inputs = row.querySelectorAll('input');
+    const inputs = row.querySelectorAll('input, textarea');
     if (isObject) {
       const name = (inputs[0] && inputs[0].value || '').trim();
       const conc = (inputs[1] && inputs[1].value || '').trim();
@@ -1064,6 +1218,19 @@ async function saveCategory() {
     renderAll();
     showToast(editingCategoryId ? '分类已更新' : '分类已创建');
   } catch(e) { console.error('saveCategory error:', e); showToast('操作失败: ' + (e.message || '')); }
+}
+
+async function deleteCategory(id, name) {
+  if (!confirm('确认删除分类"' + name + '"？\\n删除分类不会删除已有产品，但该分类入口将不再显示。')) return;
+  try {
+    await callAdminFunction({ type: 'adminDeleteCategory', id });
+    await loadCategories();
+    renderAll();
+    showToast('分类已删除');
+  } catch(e) {
+    console.error('deleteCategory error:', e);
+    showToast('删除失败: ' + (e.message || ''));
+  }
 }
 
 // ===== Modal =====
