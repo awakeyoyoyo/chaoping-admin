@@ -87,6 +87,29 @@ function testProductKeyPointsSupportMultilineEditing() {
   );
 }
 
+function testHotSolutionAdminManagementExists() {
+  assert(html.includes('data-tab="solutions"'), "solution tab should be present");
+  assert(html.includes('id="solutionSidebar"'), "solution sidebar should be present");
+  assert(html.includes("let hotSolutions"), "admin should keep hot solution state");
+  assert(html.includes("function loadHotSolutions"), "admin should load hot solutions");
+  assert(html.includes("function openHotSolutionForm"), "admin should expose solution form");
+  assert(html.includes("function saveHotSolution"), "admin should save hot solutions");
+  assert(html.includes("function deleteHotSolution"), "admin should delete hot solutions");
+  assert(html.includes("adminCreateHotSolution"), "admin should call create hot solution function");
+  assert(html.includes("adminUpdateHotSolution"), "admin should call update hot solution function");
+  assert(html.includes("adminDeleteHotSolution"), "admin should call delete hot solution function");
+}
+
+function testHotSolutionAdminUploadsImagesAndProductRows() {
+  assert(html.includes('id="hs_images"'), "solution form should upload solution images");
+  assert(html.includes('id="hs_effectImages"'), "solution form should upload effect images");
+  assert(html.includes("hot-solutions/images/"), "solution images should use solution storage path");
+  assert(html.includes("hot-solutions/effects/"), "effect images should use effect storage path");
+  assert(html.includes("方案名称"), "solution form should include name");
+  assert(html.includes("产品名称") && html.includes("含量") && html.includes("厂家"), "solution form should include product rows");
+  assert(html.includes("方案特点"), "solution form should include features");
+}
+
 Promise.resolve()
   .then(testBannerTabExists)
   .then(testBannerUploadAndDeleteHandlersExist)
@@ -98,6 +121,8 @@ Promise.resolve()
   .then(testCategoryDeleteActionExists)
   .then(testAdminIngredientSeparatorUsesBoldDot)
   .then(testProductKeyPointsSupportMultilineEditing)
+  .then(testHotSolutionAdminManagementExists)
+  .then(testHotSolutionAdminUploadsImagesAndProductRows)
   .then(() => {
     console.log("admin banner behavior tests passed");
   })
