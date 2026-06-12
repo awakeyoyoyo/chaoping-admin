@@ -194,9 +194,17 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
 .solution-actions .edit-btn { color:#2f8a42; border-color:#bfe4c7; }
 .solution-actions .del-btn { color:#d32f2f; border-color:#fce4e4; }
 .solution-product-row {
-  display:grid; grid-template-columns:1fr 0.8fr 1fr 28px; gap:8px; align-items:center; margin-bottom:8px;
+  display:grid; grid-template-columns:32px 1fr 0.8fr 1fr 28px; gap:8px; align-items:center; margin-bottom:8px;
+  padding:6px; border:1px solid transparent; border-radius:12px;
 }
 .solution-product-row input { margin:0; }
+.solution-product-row.dragging { opacity:0.55; border-color:#bfe4c7; background:#f0f7f0; }
+.solution-product-row.drag-target { border-color:#2f8a42; background:#f6faf6; }
+.solution-product-drag-handle {
+  width:28px; height:32px; border:1px solid #dce9dd; border-radius:10px;
+  background:#fff; color:#708070; cursor:grab; font-size:16px; line-height:1;
+}
+.solution-product-drag-handle:active { cursor:grabbing; }
 
 /* Modal */
 .modal-mask {
@@ -404,6 +412,7 @@ let editingProductOriginalCoverThumb = '';
 let solutionImageItems = [];
 let solutionEffectImageItems = [];
 let solutionImageItemSeq = 0;
+let solutionProductDraggedRow = null;
 
 // ===== Init =====
 document.getElementById('envIdInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
@@ -1332,7 +1341,8 @@ function moveHotSolutionImageItem(kind, id, direction) {
 
 function renderSolutionProductRows(rows) {
   const source = rows && rows.length ? rows : [{ name: '', content: '', manufacturer: '' }];
-  return source.map(row => `<div class="solution-product-row">
+  return source.map(row => `<div class="solution-product-row" draggable="true">
+    <button type="button" class="solution-product-drag-handle" title="拖动排序" aria-label="拖动调整产品顺序">☰</button>
     <input data-field="name" value="${escAttr(row.name || '')}" placeholder="产品名称">
     <input data-field="content" value="${escAttr(row.content || '')}" placeholder="含量">
     <input data-field="manufacturer" value="${escAttr(row.manufacturer || '')}" placeholder="厂家">
@@ -1344,16 +1354,143 @@ function addSolutionProductRow() {
   const container = document.getElementById('solutionProductsContainer');
   const div = document.createElement('div');
   div.className = 'solution-product-row';
-  div.innerHTML = `<input data-field="name" placeholder="产品名称">
+  div.setAttribute('draggable', 'true');
+  div.innerHTML = `<button type="button" class="solution-product-drag-handle" title="拖动排序" aria-label="拖动调整产品顺序">☰</button>
+    <input data-field="name" placeholder="产品名称">
     <input data-field="content" placeholder="含量">
     <input data-field="manufacturer" placeholder="厂家">
     <div class="rm-btn" onclick="removeSolutionProductRow(this)">✕</div>`;
   container.appendChild(div);
+  initSolutionProductRowDrag(container);
 }
 
 function removeSolutionProductRow(btn) {
   const row = btn.closest('.solution-product-row');
   if (row) row.remove();
+}
+
+/**
+ * 初始化热销方案产品行拖拽排序事件。
+ * @param {HTMLElement|null} container 产品行容器。
+ * @returns {void} 无返回值。
+ * @example
+ * initSolutionProductRowDrag(document.getElementById('solutionProductsContainer'));
+ */
+function initSolutionProductRowDrag(container) {
+  // 容器不存在时直接返回，避免弹窗未渲染导致脚本异常。
+  if (!container) return;
+  // 动态新增的行需要重新补齐 draggable 属性。
+  Array.from(container.querySelectorAll('.solution-product-row')).forEach(row => {
+    row.setAttribute('draggable', 'true');
+  });
+  // 同一个弹窗容器只绑定一次事件，避免重复触发拖拽逻辑。
+  if (container.dataset.dragReady === 'true') return;
+  container.dataset.dragReady = 'true';
+  container.addEventListener('dragstart', handleSolutionProductRowDragStart);
+  container.addEventListener('dragover', handleSolutionProductRowDragOver);
+  container.addEventListener('dragleave', handleSolutionProductRowDragLeave);
+  container.addEventListener('drop', handleSolutionProductRowDrop);
+  container.addEventListener('dragend', handleSolutionProductRowDragEnd);
+}
+
+/**
+ * 根据拖拽结果移动热销方案产品行。
+ * @param {HTMLElement|null} container 产品行容器。
+ * @param {HTMLElement|null} sourceRow 被拖动的产品行。
+ * @param {HTMLElement|null} targetRow 目标产品行。
+ * @returns {void} 无返回值。
+ * @example
+ * moveSolutionProductRowByDrag(container, firstRow, secondRow);
+ */
+function moveSolutionProductRowByDrag(container, sourceRow, targetRow) {
+  // 拖到自身或缺少必要节点时不需要调整顺序。
+  if (!container || !sourceRow || !targetRow || sourceRow === targetRow) return;
+  const rows = Array.from(container.querySelectorAll('.solution-product-row'));
+  const sourceIndex = rows.indexOf(sourceRow);
+  const targetIndex = rows.indexOf(targetRow);
+  // 找不到行索引通常表示拖拽目标不在当前容器内。
+  if (sourceIndex < 0 || targetIndex < 0) return;
+  // 向下拖动插到目标后方，向上拖动插到目标前方。
+  if (sourceIndex < targetIndex) targetRow.after(sourceRow);
+  else targetRow.before(sourceRow);
+}
+
+/**
+ * 记录当前正在拖动的热销方案产品行。
+ * @param {DragEvent} event 拖拽开始事件。
+ * @returns {void} 无返回值。
+ * @example
+ * handleSolutionProductRowDragStart(event);
+ */
+function handleSolutionProductRowDragStart(event) {
+  const row = event.target.closest('.solution-product-row');
+  // 只有产品行触发拖拽时才记录状态。
+  if (!row) return;
+  solutionProductDraggedRow = row;
+  row.classList.add('dragging');
+  // dataTransfer 存在时设置移动语义，提升浏览器拖拽反馈。
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', 'solution-product-row');
+  }
+}
+
+/**
+ * 标记拖拽经过的热销方案产品行。
+ * @param {DragEvent} event 拖拽经过事件。
+ * @returns {void} 无返回值。
+ * @example
+ * handleSolutionProductRowDragOver(event);
+ */
+function handleSolutionProductRowDragOver(event) {
+  const row = event.target.closest('.solution-product-row');
+  // 阻止默认行为后浏览器才允许 drop。
+  if (!row || row === solutionProductDraggedRow) return;
+  event.preventDefault();
+  Array.from(event.currentTarget.querySelectorAll('.solution-product-row')).forEach(item => {
+    item.classList.toggle('drag-target', item === row);
+  });
+}
+
+/**
+ * 清除离开行时的拖拽目标状态。
+ * @param {DragEvent} event 拖拽离开事件。
+ * @returns {void} 无返回值。
+ * @example
+ * handleSolutionProductRowDragLeave(event);
+ */
+function handleSolutionProductRowDragLeave(event) {
+  const row = event.target.closest('.solution-product-row');
+  // 离开当前行时移除高亮，不影响其他行状态。
+  if (row) row.classList.remove('drag-target');
+}
+
+/**
+ * 将热销方案产品行放置到目标位置。
+ * @param {DragEvent} event 拖拽释放事件。
+ * @returns {void} 无返回值。
+ * @example
+ * handleSolutionProductRowDrop(event);
+ */
+function handleSolutionProductRowDrop(event) {
+  const targetRow = event.target.closest('.solution-product-row');
+  event.preventDefault();
+  moveSolutionProductRowByDrag(event.currentTarget, solutionProductDraggedRow, targetRow);
+  handleSolutionProductRowDragEnd(event);
+}
+
+/**
+ * 清理热销方案产品行拖拽状态。
+ * @param {DragEvent} event 拖拽结束事件。
+ * @returns {void} 无返回值。
+ * @example
+ * handleSolutionProductRowDragEnd(event);
+ */
+function handleSolutionProductRowDragEnd(event) {
+  Array.from(event.currentTarget.querySelectorAll('.solution-product-row')).forEach(row => {
+    row.classList.remove('dragging', 'drag-target');
+  });
+  solutionProductDraggedRow = null;
 }
 
 function collectSolutionProducts() {
@@ -1429,6 +1566,7 @@ function openHotSolutionForm(id) {
       </select></div>
     </div>`;
   document.getElementById('solutionModal').classList.add('show');
+  initSolutionProductRowDrag(document.getElementById('solutionProductsContainer'));
   hydrateHotSolutionImagePreviews('image');
   hydrateHotSolutionImagePreviews('effect');
 }

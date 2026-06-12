@@ -110,6 +110,20 @@ function testHotSolutionAdminUploadsImagesAndProductRows() {
   assert(html.includes("方案特点"), "solution form should include features");
 }
 
+/**
+ * 验证热销方案产品行具备拖拽排序能力。
+ * @returns {void} 无返回值。
+ * @example
+ * testHotSolutionProductRowsSupportDragOrdering();
+ */
+function testHotSolutionProductRowsSupportDragOrdering() {
+  assert(html.includes("function initSolutionProductRowDrag"), "solution product rows should initialize drag ordering");
+  assert(html.includes("function moveSolutionProductRowByDrag"), "solution product rows should move by drag");
+  assert(html.includes('class="solution-product-drag-handle"'), "solution product rows should show a drag handle");
+  assert(html.includes('draggable="true"'), "solution product rows should be draggable");
+  assert(html.includes("products: collectSolutionProducts()"), "saving should collect products from current row order");
+}
+
 Promise.resolve()
   .then(testBannerTabExists)
   .then(testBannerUploadAndDeleteHandlersExist)
@@ -123,6 +137,7 @@ Promise.resolve()
   .then(testProductKeyPointsSupportMultilineEditing)
   .then(testHotSolutionAdminManagementExists)
   .then(testHotSolutionAdminUploadsImagesAndProductRows)
+  .then(testHotSolutionProductRowsSupportDragOrdering)
   .then(() => {
     console.log("admin banner behavior tests passed");
   })
