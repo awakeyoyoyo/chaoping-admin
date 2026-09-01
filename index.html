@@ -93,6 +93,26 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
   color:#536453; font-size:13px; font-weight:600; cursor:pointer;
 }
 .content-header .secondary-btn:hover { background:#f6faf6; }
+.product-content-header { flex-wrap:wrap; gap:14px; align-items:flex-start; }
+.product-header-main { flex:1; min-width:280px; }
+.product-header-main h3 { margin-bottom:12px; }
+.product-search-box {
+  display:flex; align-items:center; gap:8px; padding:8px 12px;
+  border:1px solid #dce9dd; border-radius:14px; background:#fff;
+}
+.product-search-icon { color:#708070; font-size:13px; font-weight:700; flex-shrink:0; }
+.product-search-input {
+  flex:1; min-width:0; border:none; outline:none; background:transparent;
+  font-size:14px; color:#17351f;
+}
+.product-search-input::placeholder { color:#a0b0a0; }
+.search-btn, .clear-btn {
+  border:none; background:transparent; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0;
+}
+.search-btn { color:#2f8a42; }
+.clear-btn { color:#708070; }
+.load-sentinel { height:1px; }
+.load-status { text-align:center; color:#708070; font-size:13px; padding:16px 0 8px; }
 
 /* Product cards */
 .product-grid { display:flex; flex-direction:column; gap:12px; }
@@ -399,6 +419,16 @@ let uid = '';
 let activeTab = 'products';
 let activeCategory = '全部';
 let products = [];
+let productKeyword = '';
+let productSearchedKeyword = '';
+let productPage = 1;
+let productPageSize = 20;
+let productTotal = 0;
+let productHasMore = false;
+let productLoading = false;
+let productLoadingMore = false;
+let categoryProductTotals = {};
+let productLoadObserver = null;
 let categories = [];
 let banners = [];
 let hotSolutions = [];
@@ -451,19 +481,20 @@ async function callAdminFunction(data) {
   return result.data;
 }
 
-async function getTempFileURLs(fileList) {
-  const files = (fileList || []).filter(Boolean);
-  if (!files.length) return [];
-  const resp = await app.callFunction({
-    name: 'quickstartFunctions',
-    data: { type: 'getTempFileURLs', fileList: files }
-  });
-  const result = resp.result || {};
-  if (!result.success) {
-    console.warn('getTempFileURLs failed', result.errMsg);
-    return [];
-  }
-  return Array.isArray(result.data) ? result.data : [];
+function fileIdToCdnUrl(fileID) {
+  const id = String(fileID || '');
+  if (!id.startsWith('cloud://')) return '';
+  const rest = id.slice('cloud://'.length);
+  const slashIndex = rest.indexOf('/');
+  if (slashIndex <= 0) return '';
+  const envId = rest.slice(0, slashIndex).split('.')[0];
+  const cloudPath = rest.slice(slashIndex + 1);
+  if (!envId || !cloudPath) return '';
+  return `https://${envId}.tcb.qcloud.la/${cloudPath}`;
+}
+
+function getTempFileURLs(fileList) {
+  return (fileList || []).filter(Boolean).map(fileIdToCdnUrl);
 }
 
 // 自动恢复登录状态
@@ -533,30 +564,155 @@ function doLogout() {
 
 // ===== Load =====
 async function loadAll() {
-  await Promise.all([loadProducts(), loadCategories(), loadBanners(), loadHotSolutions()]);
+  await Promise.all([loadCategories(), loadBanners(), loadHotSolutions()]);
+  await Promise.all([resetProductList(), refreshCategoryProductTotals()]);
+  renderAll();
+}
+
+function buildProductListRequest(page) {
+  const data = {
+    type: 'getProducts',
+    includeInactive: true,
+    page,
+    pageSize: productPageSize,
+  };
+  if (productSearchedKeyword) data.keyword = productSearchedKeyword;
+  if (activeCategory !== '全部') data.category = activeCategory;
+  return data;
+}
+
+async function fetchProductsPage(page) {
+  const resp = await app.callFunction({
+    name: 'quickstartFunctions',
+    data: buildProductListRequest(page),
+  });
+  const result = resp.result || {};
+  if (!result.success) {
+    throw new Error(result.errMsg || '加载产品失败');
+  }
+  const items = Array.isArray(result.data) ? result.data : [];
+  return {
+    items,
+    total: typeof result.total === 'number' ? result.total : items.length,
+    page: result.page || page,
+    pageSize: result.pageSize || productPageSize,
+  };
+}
+
+async function attachProductImageUrlsForItems(items) {
+  const firstImages = items.map(getProductListImageFileID).filter(Boolean);
+  const urls = await getTempFileURLs(firstImages);
+  const urlMap = {};
+  firstImages.forEach((fileID, idx) => { if (urls[idx]) urlMap[fileID] = urls[idx]; });
+  return items.map(p => {
+    const imageFileID = getProductListImageFileID(p);
+    return { ...p, imageUrl: getDirectProductImageUrl(p) || urlMap[imageFileID] || '' };
+  });
+}
+
+async function resetProductList() {
+  productPage = 1;
+  productLoading = true;
+  productLoadingMore = false;
+  disconnectProductLoadObserver();
+  try {
+    const { items, total, page } = await fetchProductsPage(1);
+    products = await attachProductImageUrlsForItems(items);
+    productTotal = total;
+    productPage = page;
+    productHasMore = products.length < productTotal;
+  } catch (e) {
+    console.error('resetProductList', e);
+    products = [];
+    productTotal = 0;
+    productHasMore = false;
+  } finally {
+    productLoading = false;
+  }
+}
+
+async function loadMoreProducts() {
+  if (activeTab !== 'products' || productLoading || productLoadingMore || !productHasMore) return;
+  productLoadingMore = true;
+  renderContent();
+  try {
+    const nextPage = productPage + 1;
+    const { items, total, page } = await fetchProductsPage(nextPage);
+    const withUrls = await attachProductImageUrlsForItems(items);
+    products = products.concat(withUrls);
+    productTotal = total;
+    productPage = page;
+    productHasMore = products.length < productTotal;
+  } catch (e) {
+    console.error('loadMoreProducts', e);
+    showToast('加载更多失败');
+  } finally {
+    productLoadingMore = false;
+    renderContent();
+  }
+}
+
+async function refreshCategoryProductTotals() {
+  if (!app) return;
+  try {
+    const requests = [{ key: '全部', category: undefined }];
+    categories.forEach(c => requests.push({ key: c.name, category: c.name }));
+    const results = await Promise.all(requests.map(async ({ key, category }) => {
+      const data = { type: 'getProducts', includeInactive: true, page: 1, pageSize: 1 };
+      if (category) data.category = category;
+      const resp = await app.callFunction({ name: 'quickstartFunctions', data });
+      const result = resp.result || {};
+      return { key, total: result.success ? (result.total || 0) : 0 };
+    }));
+    categoryProductTotals = {};
+    results.forEach(({ key, total }) => { categoryProductTotals[key] = total; });
+  } catch (e) {
+    console.error('refreshCategoryProductTotals', e);
+  }
+}
+
+function disconnectProductLoadObserver() {
+  if (productLoadObserver) {
+    productLoadObserver.disconnect();
+    productLoadObserver = null;
+  }
+}
+
+function setupProductLoadObserver() {
+  disconnectProductLoadObserver();
+  if (activeTab !== 'products' || !productHasMore || productLoading || productLoadingMore) return;
+  const scrollRoot = document.getElementById('contentArea');
+  const sentinel = document.getElementById('productLoadSentinel');
+  if (!scrollRoot || !sentinel) return;
+  productLoadObserver = new IntersectionObserver((entries) => {
+    if (entries.some(entry => entry.isIntersecting)) {
+      loadMoreProducts();
+    }
+  }, { root: scrollRoot, rootMargin: '120px', threshold: 0 });
+  productLoadObserver.observe(sentinel);
+}
+
+function onProductSearchInput(e) {
+  productKeyword = e.target.value;
+}
+
+async function onProductSearchConfirm() {
+  productSearchedKeyword = productKeyword.trim();
+  productPage = 1;
+  await resetProductList();
+  renderAll();
+}
+
+async function onClearProductKeyword() {
+  productKeyword = '';
+  productSearchedKeyword = '';
+  productPage = 1;
+  await resetProductList();
   renderAll();
 }
 
 async function loadProducts() {
-  try {
-    const resp = await app.callFunction({
-      name: 'quickstartFunctions',
-      data: { type: 'getProducts', includeInactive: true, pageSize: 200 }
-    });
-    products = (resp.result && resp.result.success) ? (resp.result.data || []) : [];
-    await attachProductImageUrls();
-  } catch(e) { console.error('loadProducts', e); products = []; }
-}
-
-async function attachProductImageUrls() {
-  const firstImages = products.map(getProductListImageFileID).filter(Boolean);
-  const urls = await getTempFileURLs(firstImages);
-  const urlMap = {};
-  firstImages.forEach((fileID, idx) => { if (urls[idx]) urlMap[fileID] = urls[idx]; });
-  products = products.map(p => {
-    const imageFileID = getProductListImageFileID(p);
-    return { ...p, imageUrl: getDirectProductImageUrl(p) || urlMap[imageFileID] || '' };
-  });
+  await resetProductList();
 }
 
 function getProductListImageFileID(product) {
@@ -631,6 +787,7 @@ function switchTab(tab) {
     el.classList.toggle('active', el.dataset.tab === tab);
   });
   activeCategory = '全部';
+  if (tab !== 'products') disconnectProductLoadObserver();
   renderAll();
 }
 
@@ -649,17 +806,14 @@ function renderAll() {
 
 function renderSidebar() {
   if (activeTab === 'products') {
-    const catCounts = {};
-    products.forEach(p => {
-      getProductCategories(p).forEach(cat => {
-        catCounts[cat] = (catCounts[cat] || 0) + 1;
-      });
-    });
+    const allCount = typeof categoryProductTotals['全部'] === 'number'
+      ? categoryProductTotals['全部']
+      : products.length;
 
     let html = `<div class="sidebar-item ${activeCategory === '全部' ? 'active' : ''}" onclick="selectCategory('全部')">
-      <span>全部产品</span><span class="count">${products.length}</span></div>`;
+      <span>全部产品</span><span class="count">${allCount}</span></div>`;
     categories.forEach(c => {
-      const count = catCounts[c.name] || 0;
+      const count = typeof categoryProductTotals[c.name] === 'number' ? categoryProductTotals[c.name] : 0;
       html += `<div class="sidebar-item ${activeCategory === c.name ? 'active' : ''}" onclick="selectCategory('${c.name}')">
         <span>${c.iconText || '📦'} ${c.name}</span><span class="count">${count}</span></div>`;
     });
@@ -688,8 +842,10 @@ function renderSidebar() {
   }
 }
 
-function selectCategory(cat) {
+async function selectCategory(cat) {
   activeCategory = cat;
+  productPage = 1;
+  await resetProductList();
   renderAll();
 }
 
@@ -723,20 +879,44 @@ function onSidebarAdd() {
 function renderContent() {
   const area = document.getElementById('contentArea');
   if (activeTab === 'products') {
-    let filtered = activeCategory === '全部' ? products : products.filter(p => getProductCategories(p).includes(activeCategory));
+    const summaryText = productSearchedKeyword
+      ? `搜索：${escHtml(productSearchedKeyword)}`
+      : escHtml(activeCategory);
+    const countText = `已显示 ${products.length} / 共 ${productTotal} 个产品`;
+    const clearBtnHtml = productKeyword
+      ? `<button type="button" class="clear-btn" onclick="onClearProductKeyword()">清除</button>`
+      : '';
 
-    let html = `<div class="content-header">
-      <h3>${activeCategory} <span style="font-size:14px;color:#708070;font-weight:400;">(${filtered.length}个)</span></h3>
+    let html = `<div class="content-header product-content-header">
+      <div class="product-header-main">
+        <h3>${summaryText} <span style="font-size:14px;color:#708070;font-weight:400;">(${countText})</span></h3>
+        <div class="product-search-box">
+          <span class="product-search-icon">查</span>
+          <input
+            class="product-search-input"
+            value="${escAttr(productKeyword)}"
+            placeholder="搜索产品、类别、防治对象"
+            oninput="onProductSearchInput(event)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();onProductSearchConfirm();}"
+          />
+          ${clearBtnHtml}
+          <button type="button" class="search-btn" onclick="onProductSearchConfirm()">搜索</button>
+        </div>
+      </div>
       <div class="header-actions">
         <button class="secondary-btn" onclick="cleanupLegacyProductFields()">清理旧数据</button>
         <button class="add-btn" onclick="openProductForm()">+ 添加产品</button>
       </div></div>`;
 
-    if (filtered.length === 0) {
-      html += '<div class="empty">暂无产品数据</div>';
+    if (productLoading) {
+      html += '<div class="empty">加载中...</div>';
+    } else if (products.length === 0) {
+      html += productSearchedKeyword
+        ? '<div class="empty">未找到相关产品</div>'
+        : '<div class="empty">暂无产品数据</div>';
     } else {
       html += '<div class="product-grid">';
-      filtered.forEach(p => {
+      products.forEach(p => {
         const ingText = (p.active_ingredients || [])
           .map(i => escHtml(i.name + (i.concentration || '')))
           .filter(Boolean)
@@ -760,8 +940,12 @@ function renderContent() {
           </div></div>`;
       });
       html += '</div>';
+      if (productHasMore) html += '<div id="productLoadSentinel" class="load-sentinel"></div>';
+      if (productLoadingMore) html += '<div class="load-status">加载更多中...</div>';
+      if (!productHasMore) html += '<div class="load-status">已加载全部</div>';
     }
     area.innerHTML = html;
+    setupProductLoadObserver();
   } else if (activeTab === 'solutions') {
     const activeSolutions = hotSolutions.filter(s => s.status !== 'deleted');
     let html = `<div class="content-header">
@@ -1212,7 +1396,7 @@ async function saveProduct() {
       await callAdminFunction({ type: 'adminCreateProduct', data });
     }
     closeModal('productModal');
-    await loadProducts();
+    await Promise.all([resetProductList(), refreshCategoryProductTotals()]);
     renderAll();
     showToast(editingProductId ? '产品已更新' : '产品已创建');
   } catch(e) { console.error('saveProduct error:', e); showToast('操作失败: ' + (e.message || '')); }
@@ -1222,7 +1406,7 @@ async function deleteProduct(id, name) {
   if (!confirm('确认删除产品"' + name + '"？\\n删除后用户将不可见。')) return;
   try {
     await callAdminFunction({ type: 'adminDeleteProduct', id });
-    await loadProducts();
+    await Promise.all([resetProductList(), refreshCategoryProductTotals()]);
     renderAll();
     showToast('已删除');
   } catch(e) { showToast('删除失败'); console.error(e); }
@@ -1232,7 +1416,7 @@ async function cleanupLegacyProductFields() {
   if (!confirm('确认清理旧产品数据字段？\\n清理后不影响产品名称、图片、分类、剂型和规格。')) return;
   try {
     const result = await callAdminFunction({ type: 'adminClearProductLegacyFields' });
-    await loadProducts();
+    await Promise.all([resetProductList(), refreshCategoryProductTotals()]);
     renderAll();
     const updated = result && typeof result.updated === 'number' ? result.updated : 0;
     showToast(`旧数据已清理，更新 ${updated} 条`);

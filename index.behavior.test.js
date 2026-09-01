@@ -124,7 +124,26 @@ function testHotSolutionProductRowsSupportDragOrdering() {
   assert(html.includes("products: collectSolutionProducts()"), "saving should collect products from current row order");
 }
 
+function testProductListSupportsSearchAndInfiniteScroll() {
+  assert(html.includes('class="product-search-input"'), "product search input should exist");
+  assert(html.includes("function onProductSearchConfirm"), "product search confirm handler should exist");
+  assert(html.includes("function onClearProductKeyword"), "product search clear handler should exist");
+  assert(html.includes("function resetProductList"), "product list reset handler should exist");
+  assert(html.includes("function loadMoreProducts"), "product load more handler should exist");
+  assert(html.includes("function setupProductLoadObserver"), "product infinite scroll observer should exist");
+  assert(html.includes("function refreshCategoryProductTotals"), "category totals refresh should exist");
+  assert(html.includes('id="productLoadSentinel"'), "product load sentinel should exist");
+  assert(!html.includes("pageSize: 200"), "admin should not hardcode pageSize 200");
+  assert(html.includes("已显示 ${products.length} / 共 ${productTotal} 个产品"), "product count summary should exist");
+}
+
+function testFileIdToCdnUrlConvertsCloudFileId() {
+  assert(html.includes("fileIdToCdnUrl"), "admin should define a fileIdToCdnUrl helper");
+  assert(html.includes("tcb.qcloud.la"), "admin should convert fileIDs to the default CDN domain");
+}
+
 Promise.resolve()
+  .then(testFileIdToCdnUrlConvertsCloudFileId)
   .then(testBannerTabExists)
   .then(testBannerUploadAndDeleteHandlersExist)
   .then(testAdminScriptSyntax)
@@ -138,6 +157,7 @@ Promise.resolve()
   .then(testHotSolutionAdminManagementExists)
   .then(testHotSolutionAdminUploadsImagesAndProductRows)
   .then(testHotSolutionProductRowsSupportDragOrdering)
+  .then(testProductListSupportsSearchAndInfiniteScroll)
   .then(() => {
     console.log("admin banner behavior tests passed");
   })
