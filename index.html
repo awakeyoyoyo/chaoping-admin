@@ -487,10 +487,10 @@ function fileIdToCdnUrl(fileID) {
   const rest = id.slice('cloud://'.length);
   const slashIndex = rest.indexOf('/');
   if (slashIndex <= 0) return '';
-  const envId = rest.slice(0, slashIndex).split('.')[0];
+  const storageId = rest.slice(0, slashIndex).split('.')[1] || rest.slice(0, slashIndex).split('.')[0];
   const cloudPath = rest.slice(slashIndex + 1);
-  if (!envId || !cloudPath) return '';
-  return `https://${envId}.tcb.qcloud.la/${cloudPath}`;
+  if (!storageId || !cloudPath) return '';
+  return `https://${storageId}.tcb.qcloud.la/${cloudPath}`;
 }
 
 function getTempFileURLs(fileList) {
