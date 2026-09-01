@@ -162,6 +162,10 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
 .cat-card .cat-actions { display:flex; gap:8px; flex-shrink:0; }
 .cat-card .del-btn { padding:6px 16px; border:1px solid #fce4e4; border-radius:14px; background:#fff; color:#d32f2f; cursor:pointer; font-size:12px; }
 .cat-card .del-btn:hover { background:#fef5f5; }
+.cat-icon-thumb {
+  width:34px; height:34px; border-radius:10px; object-fit:contain;
+  background:#ffffff; border:1px solid #edf2ed; vertical-align:middle; margin-right:8px;
+}
 
 /* Banner management */
 .banner-upload-card {
@@ -450,6 +454,7 @@ let hotSolutions = [];
 let editingProductId = null;
 let editingCategoryId = null;
 let editingDiseaseCategoryId = null;
+let diseaseCategoryIconFile = null;
 let editingHotSolutionId = null;
 let productImageItems = [];
 let productImageItemSeq = 0;
@@ -762,7 +767,16 @@ async function loadDiseaseCategories() {
       data: { type: 'getDiseaseCategories', includeInactive: true }
     });
     diseaseCategories = (resp.result && resp.result.success) ? (resp.result.data || []) : [];
+    await attachDiseaseCategoryIconUrls();
   } catch(e) { console.error('loadDiseaseCategories', e); diseaseCategories = []; }
+}
+
+async function attachDiseaseCategoryIconUrls() {
+  const fileIDs = diseaseCategories.map(c => c.icon).filter(Boolean);
+  const urls = await getTempFileURLs(fileIDs);
+  const urlMap = {};
+  fileIDs.forEach((fileID, idx) => { if (urls[idx]) urlMap[fileID] = urls[idx]; });
+  diseaseCategories = diseaseCategories.map(c => ({ ...c, iconUrl: urlMap[c.icon] || '' }));
 }
 
 async function loadBanners() {
@@ -863,8 +877,11 @@ function renderSidebar() {
     if (activeTab === 'diseases') {
       let html = '';
       diseaseCategories.forEach(c => {
+        const iconHtml = c.iconUrl
+          ? `<img class="cat-icon-thumb" src="${escAttr(c.iconUrl)}" alt="${escAttr(c.name)}">`
+          : escHtml(c.iconText || '病');
         html += `<div class="sidebar-item ${activeCategory === c._id ? 'active' : ''}" onclick="selectCategoryItem('${c._id}')">
-          <span>${c.iconText || '病'} ${c.name}</span><span class="count">排序${c.sort || 0}</span></div>`;
+          <span>${iconHtml} ${escHtml(c.name)}</span><span class="count">排序${c.sort || 0}</span></div>`;
       });
       document.getElementById('diseaseSidebar').innerHTML = html;
       return;
@@ -1076,9 +1093,12 @@ function renderContent() {
     } else {
       html += '<div class="cat-list">';
       diseaseCategories.forEach(c => {
+        const iconHtml = c.iconUrl
+          ? `<img class="cat-icon-thumb" src="${escAttr(c.iconUrl)}" alt="${escAttr(c.name)}">`
+          : escHtml(c.iconText || '病');
         html += `<div class="cat-card">
           <div class="cat-info">
-            <div class="cat-name">${escHtml(c.iconText || '病')} ${escHtml(c.name)} <span class="status-badge ${c.status || 'active'}">${statusLabel(c.status)}</span></div>
+            <div class="cat-name">${iconHtml}${escHtml(c.name)} <span class="status-badge ${c.status || 'active'}">${statusLabel(c.status)}</span></div>
             <div class="cat-meta">排序：${c.sort || 0} | 更新时间：${fmtDate(c.update_time)}</div>
           </div>
           <div class="cat-actions">
@@ -2006,11 +2026,24 @@ async function deleteCategory(id, name) {
 // ===== Disease Category Form =====
 function openDiseaseCategoryForm(id) {
   editingDiseaseCategoryId = id || null;
+  diseaseCategoryIconFile = null;
   const cat = id ? diseaseCategories.find(c => c._id === id) : null;
+  const iconPreview = cat && cat.iconUrl
+    ? `<img src="${escAttr(cat.iconUrl)}" alt="${escAttr(cat.name)}">`
+    : escHtml(cat ? cat.iconText || '病' : '病');
   document.getElementById('diseaseModalTitle').textContent = id ? '编辑病害分类' : '添加病害分类';
 
   document.getElementById('diseaseModalBody').innerHTML = `
     <div class="field"><label>病害分类名称 *</label><input id="dcf_name" value="${escAttr(cat ? cat.name : '')}" placeholder="如：白粉病"></div>
+    <div class="field"><label>图标图片</label>
+      <div class="image-upload-card">
+        <div id="diseaseIconPreview" class="image-preview">${iconPreview}</div>
+        <div class="image-upload-actions">
+          <input id="dcf_icon" type="file" accept="image/*" onchange="onDiseaseCategoryIconChange(event)">
+          <div class="image-upload-hint">可上传病害分类图标图片。上传后小程序首页优先展示图片图标。</div>
+        </div>
+      </div>
+    </div>
     <div class="field"><label>单字图标</label><input id="dcf_iconText" value="${escAttr(cat ? cat.iconText || '' : '')}" maxlength="1" placeholder="如：粉"></div>
     <div class="field"><label>排序序号</label><input type="number" id="dcf_sort" value="${cat ? (cat.sort || 0) : 0}"></div>
     <div class="field"><label>启用状态</label><select id="dcf_status">
@@ -2021,12 +2054,44 @@ function openDiseaseCategoryForm(id) {
   document.getElementById('diseaseModal').classList.add('show');
 }
 
+function onDiseaseCategoryIconChange(event) {
+  diseaseCategoryIconFile = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+  const preview = document.getElementById('diseaseIconPreview');
+  if (preview && diseaseCategoryIconFile) {
+    preview.innerHTML = `<img src="${escAttr(URL.createObjectURL(diseaseCategoryIconFile))}" alt="病害分类图标">`;
+  }
+}
+
+async function uploadDiseaseCategoryIconIfNeeded() {
+  if (!diseaseCategoryIconFile) {
+    const cat = editingDiseaseCategoryId ? diseaseCategories.find(c => c._id === editingDiseaseCategoryId) : null;
+    return cat ? cat.icon || '' : '';
+  }
+
+  const safeName = sanitizeFileName(diseaseCategoryIconFile.name || 'disease-icon.jpg');
+  const upload = await app.uploadFile({
+    cloudPath: `disease-categories/icons/${Date.now()}-${safeName}`,
+    filePath: diseaseCategoryIconFile,
+  });
+  return upload && upload.fileID ? upload.fileID : '';
+}
+
 async function saveDiseaseCategory() {
   const name = document.getElementById('dcf_name').value.trim();
   if (!name) { showToast('请填写病害分类名称'); return; }
 
+  let icon = '';
+  try {
+    icon = await uploadDiseaseCategoryIconIfNeeded();
+  } catch (e) {
+    console.error('upload disease category icon error:', e);
+    showToast('图标上传失败: ' + (e.message || ''));
+    return;
+  }
+
   const data = {
     name,
+    icon,
     iconText: document.getElementById('dcf_iconText').value.trim(),
     sort: parseInt(document.getElementById('dcf_sort').value) || 0,
     status: document.getElementById('dcf_status').value
@@ -2063,7 +2128,7 @@ function closeModal(id) {
   document.getElementById(id).classList.remove('show');
   if (id === 'productModal') editingProductId = null;
   if (id === 'categoryModal') editingCategoryId = null;
-  if (id === 'diseaseModal') editingDiseaseCategoryId = null;
+  if (id === 'diseaseModal') { editingDiseaseCategoryId = null; diseaseCategoryIconFile = null; }
   if (id === 'solutionModal') editingHotSolutionId = null;
 }
 

@@ -112,6 +112,11 @@ function testDiseaseCategoryAdminManagementExists() {
   assert(html.includes("adminCreateDiseaseCategory"), "admin should call create disease category function");
   assert(html.includes("adminUpdateDiseaseCategory"), "admin should call update disease category function");
   assert(html.includes("adminDeleteDiseaseCategory"), "admin should call delete disease category function");
+  assert(html.includes('id="dcf_icon"'), "disease category form should include icon image upload input");
+  assert(html.includes("function onDiseaseCategoryIconChange"), "admin should preview disease category icon uploads");
+  assert(html.includes("function uploadDiseaseCategoryIconIfNeeded"), "admin should upload disease category icons");
+  assert(html.includes("disease-categories/icons/"), "disease category icons should use disease icon storage path");
+  assert(html.includes("icon,"), "disease category save payload should include icon fileID");
 }
 
 function testProductFormSupportsDiseaseCategories() {
