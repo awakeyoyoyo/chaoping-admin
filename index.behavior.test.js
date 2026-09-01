@@ -100,6 +100,27 @@ function testHotSolutionAdminManagementExists() {
   assert(html.includes("adminDeleteHotSolution"), "admin should call delete hot solution function");
 }
 
+function testDiseaseCategoryAdminManagementExists() {
+  assert(html.includes('data-tab="diseases"'), "disease category tab should be present");
+  assert(html.includes('id="diseaseSidebar"'), "disease sidebar should be present");
+  assert(html.includes('id="diseaseModal"'), "disease category modal should be present");
+  assert(html.includes("let diseaseCategories"), "admin should keep disease category state");
+  assert(html.includes("function loadDiseaseCategories"), "admin should load disease categories");
+  assert(html.includes("function openDiseaseCategoryForm"), "admin should expose disease category form");
+  assert(html.includes("function saveDiseaseCategory"), "admin should save disease categories");
+  assert(html.includes("function deleteDiseaseCategory"), "admin should delete disease categories");
+  assert(html.includes("adminCreateDiseaseCategory"), "admin should call create disease category function");
+  assert(html.includes("adminUpdateDiseaseCategory"), "admin should call update disease category function");
+  assert(html.includes("adminDeleteDiseaseCategory"), "admin should call delete disease category function");
+}
+
+function testProductFormSupportsDiseaseCategories() {
+  assert(html.includes('name="pf_diseaseCategories"'), "product form should render disease category checkboxes");
+  assert(html.includes("function getSelectedProductDiseaseCategories"), "admin should collect selected disease categories");
+  assert(html.includes("diseaseCategories: diseaseCategoriesValue"), "product save payload should include disease categories");
+  assert(html.includes("病害：${escHtml(diseaseText)}"), "product cards should display disease categories");
+}
+
 function testHotSolutionAdminUploadsImagesAndProductRows() {
   assert(html.includes('id="hs_images"'), "solution form should upload solution images");
   assert(html.includes('id="hs_effectImages"'), "solution form should upload effect images");
@@ -155,6 +176,8 @@ Promise.resolve()
   .then(testAdminIngredientSeparatorUsesBoldDot)
   .then(testProductKeyPointsSupportMultilineEditing)
   .then(testHotSolutionAdminManagementExists)
+  .then(testDiseaseCategoryAdminManagementExists)
+  .then(testProductFormSupportsDiseaseCategories)
   .then(testHotSolutionAdminUploadsImagesAndProductRows)
   .then(testHotSolutionProductRowsSupportDragOrdering)
   .then(testProductListSupportsSearchAndInfiniteScroll)

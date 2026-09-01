@@ -357,12 +357,14 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
       <div class="sidebar-nav">
         <div class="nav-item active" data-tab="products" onclick="switchTab('products')">产品</div>
         <div class="nav-item" data-tab="categories" onclick="switchTab('categories')">分类</div>
+        <div class="nav-item" data-tab="diseases" onclick="switchTab('diseases')">病害</div>
         <div class="nav-item" data-tab="banners" onclick="switchTab('banners')">轮播</div>
         <div class="nav-item" data-tab="solutions" onclick="switchTab('solutions')">方案</div>
       </div>
       <!-- Product sidebar: category filter -->
       <div id="productSidebar" class="sidebar-list"></div>
       <div id="categorySidebar" class="sidebar-list" style="display:none;"></div>
+      <div id="diseaseSidebar" class="sidebar-list" style="display:none;"></div>
       <div id="bannerSidebar" class="sidebar-list" style="display:none;"></div>
       <div id="solutionSidebar" class="sidebar-list" style="display:none;"></div>
       <button id="sidebarAddBtn" class="sidebar-add" onclick="onSidebarAdd()">+ 添加</button>
@@ -399,6 +401,18 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background:#f3
   </div>
 </div>
 
+<!-- Disease Category Form Modal -->
+<div id="diseaseModal" class="modal-mask" onclick="closeModal('diseaseModal')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <h3 id="diseaseModalTitle">添加病害分类</h3>
+    <div class="modal-body" id="diseaseModalBody"></div>
+    <div class="modal-footer">
+      <button class="cancel-btn" onclick="closeModal('diseaseModal')">取消</button>
+      <button class="save-btn" id="diseaseSaveBtn" onclick="saveDiseaseCategory()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Hot Solution Form Modal -->
 <div id="solutionModal" class="modal-mask" onclick="closeModal('solutionModal')">
   <div class="modal-box" onclick="event.stopPropagation()">
@@ -430,10 +444,12 @@ let productLoadingMore = false;
 let categoryProductTotals = {};
 let productLoadObserver = null;
 let categories = [];
+let diseaseCategories = [];
 let banners = [];
 let hotSolutions = [];
 let editingProductId = null;
 let editingCategoryId = null;
+let editingDiseaseCategoryId = null;
 let editingHotSolutionId = null;
 let productImageItems = [];
 let productImageItemSeq = 0;
@@ -564,7 +580,7 @@ function doLogout() {
 
 // ===== Load =====
 async function loadAll() {
-  await Promise.all([loadCategories(), loadBanners(), loadHotSolutions()]);
+  await Promise.all([loadCategories(), loadDiseaseCategories(), loadBanners(), loadHotSolutions()]);
   await Promise.all([resetProductList(), refreshCategoryProductTotals()]);
   renderAll();
 }
@@ -739,6 +755,16 @@ async function loadCategories() {
   } catch(e) { console.error('loadCategories', e); categories = []; }
 }
 
+async function loadDiseaseCategories() {
+  try {
+    const resp = await app.callFunction({
+      name: 'quickstartFunctions',
+      data: { type: 'getDiseaseCategories', includeInactive: true }
+    });
+    diseaseCategories = (resp.result && resp.result.success) ? (resp.result.data || []) : [];
+  } catch(e) { console.error('loadDiseaseCategories', e); diseaseCategories = []; }
+}
+
 async function loadBanners() {
   try {
     const resp = await app.callFunction({
@@ -796,10 +822,11 @@ function renderAll() {
   renderSidebar();
   renderContent();
   const addBtn = document.getElementById('sidebarAddBtn');
-  addBtn.textContent = activeTab === 'products' ? '+ 添加产品' : activeTab === 'categories' ? '+ 添加分类' : activeTab === 'banners' ? '+ 上传轮播' : '+ 添加方案';
-  addBtn.onclick = activeTab === 'products' ? () => openProductForm() : activeTab === 'categories' ? () => openCategoryForm() : activeTab === 'banners' ? () => triggerBannerUpload() : () => openHotSolutionForm();
+  addBtn.textContent = activeTab === 'products' ? '+ 添加产品' : activeTab === 'categories' ? '+ 添加分类' : activeTab === 'diseases' ? '+ 添加病害' : activeTab === 'banners' ? '+ 上传轮播' : '+ 添加方案';
+  addBtn.onclick = activeTab === 'products' ? () => openProductForm() : activeTab === 'categories' ? () => openCategoryForm() : activeTab === 'diseases' ? () => openDiseaseCategoryForm() : activeTab === 'banners' ? () => triggerBannerUpload() : () => openHotSolutionForm();
   document.getElementById('productSidebar').style.display = activeTab === 'products' ? '' : 'none';
   document.getElementById('categorySidebar').style.display = activeTab === 'categories' ? '' : 'none';
+  document.getElementById('diseaseSidebar').style.display = activeTab === 'diseases' ? '' : 'none';
   document.getElementById('bannerSidebar').style.display = activeTab === 'banners' ? '' : 'none';
   document.getElementById('solutionSidebar').style.display = activeTab === 'solutions' ? '' : 'none';
 }
@@ -833,6 +860,16 @@ function renderSidebar() {
       return;
     }
 
+    if (activeTab === 'diseases') {
+      let html = '';
+      diseaseCategories.forEach(c => {
+        html += `<div class="sidebar-item ${activeCategory === c._id ? 'active' : ''}" onclick="selectCategoryItem('${c._id}')">
+          <span>${c.iconText || '病'} ${c.name}</span><span class="count">排序${c.sort || 0}</span></div>`;
+      });
+      document.getElementById('diseaseSidebar').innerHTML = html;
+      return;
+    }
+
     let html = '';
     categories.forEach(c => {
       html += `<div class="sidebar-item ${activeCategory === c._id ? 'active' : ''}" onclick="selectCategoryItem('${c._id}')">
@@ -863,8 +900,19 @@ function getProductCategories(product) {
   return [...new Set(source.map(item => String(item || '').trim()).filter(Boolean))];
 }
 
+function getProductDiseaseCategories(product) {
+  const source = Array.isArray(product.diseaseCategories) ? product.diseaseCategories : [];
+  return [...new Set(source.map(item => String(item || '').trim()).filter(Boolean))];
+}
+
 function getSelectedProductCategories() {
   return Array.from(document.querySelectorAll('input[name="pf_categories"]:checked'))
+    .map(input => input.value)
+    .filter(Boolean);
+}
+
+function getSelectedProductDiseaseCategories() {
+  return Array.from(document.querySelectorAll('input[name="pf_diseaseCategories"]:checked'))
     .map(input => input.value)
     .filter(Boolean);
 }
@@ -872,6 +920,7 @@ function getSelectedProductCategories() {
 function onSidebarAdd() {
   if (activeTab === 'products') openProductForm();
   else if (activeTab === 'categories') openCategoryForm();
+  else if (activeTab === 'diseases') openDiseaseCategoryForm();
   else if (activeTab === 'banners') triggerBannerUpload();
   else openHotSolutionForm();
 }
@@ -922,6 +971,7 @@ function renderContent() {
           .filter(Boolean)
           .join('<strong class="ingredient-separator">·</strong>') || '成分待补充';
         const categoryText = getProductCategories(p).join('、') || '未分类';
+        const diseaseText = getProductDiseaseCategories(p).join('、') || '未设置病害';
         const imageHtml = p.imageUrl
           ? `<img class="product-thumb" src="${escAttr(p.imageUrl)}" alt="${escAttr(p.name)}">`
           : `<div class="product-icon">${p.iconText || '品'}</div>`;
@@ -931,6 +981,7 @@ function renderContent() {
             <div class="name">${escHtml(p.name)} <span class="status-badge ${p.status || 'active'}">${statusLabel(p.status)}</span></div>
             <div class="ingredient">${ingText}</div>
             <div class="meta">分类：${escHtml(categoryText)}</div>
+            <div class="meta">病害：${escHtml(diseaseText)}</div>
             <div class="meta">剂型：${escHtml(p.formulation || '待补充')}</div>
             <div class="spec">规格：${escHtml(p.specification || '待补充')}</div>
           </div>
@@ -1015,6 +1066,29 @@ function renderContent() {
       html += '</div>';
     }
     area.innerHTML = html;
+  } else if (activeTab === 'diseases') {
+    let html = `<div class="content-header">
+      <h3>病害分类管理 <span style="font-size:14px;color:#708070;font-weight:400;">(${diseaseCategories.length}个)</span></h3>
+      <button class="add-btn" onclick="openDiseaseCategoryForm()">+ 添加病害分类</button></div>`;
+
+    if (diseaseCategories.length === 0) {
+      html += '<div class="empty">暂无病害分类数据</div>';
+    } else {
+      html += '<div class="cat-list">';
+      diseaseCategories.forEach(c => {
+        html += `<div class="cat-card">
+          <div class="cat-info">
+            <div class="cat-name">${escHtml(c.iconText || '病')} ${escHtml(c.name)} <span class="status-badge ${c.status || 'active'}">${statusLabel(c.status)}</span></div>
+            <div class="cat-meta">排序：${c.sort || 0} | 更新时间：${fmtDate(c.update_time)}</div>
+          </div>
+          <div class="cat-actions">
+            <button class="edit-btn" onclick="openDiseaseCategoryForm('${c._id}')">编辑</button>
+            <button class="del-btn" onclick="deleteDiseaseCategory('${c._id}','${escAttr(c.name)}')">删除病害</button>
+          </div></div>`;
+      });
+      html += '</div>';
+    }
+    area.innerHTML = html;
   } else {
     let html = `<div class="content-header">
       <h3>分类管理 <span style="font-size:14px;color:#708070;font-weight:400;">(${categories.length}个)</span></h3>
@@ -1055,6 +1129,11 @@ function openProductForm(id) {
     const checked = selectedCategories.includes(c.name) ? 'checked' : '';
     return `<label class="category-checkbox"><input type="checkbox" name="pf_categories" value="${escAttr(c.name)}" ${checked}>${escHtml(c.name)}</label>`;
   }).join('');
+  const selectedDiseaseCategories = getProductDiseaseCategories(product || {});
+  const diseaseOptions = diseaseCategories.map(c => {
+    const checked = selectedDiseaseCategories.includes(c.name) ? 'checked' : '';
+    return `<label class="category-checkbox"><input type="checkbox" name="pf_diseaseCategories" value="${escAttr(c.name)}" ${checked}>${escHtml(c.name)}</label>`;
+  }).join('');
 
   const ingredients = (product && product.active_ingredients && product.active_ingredients.length)
     ? product.active_ingredients : [{ name: '', concentration: '' }];
@@ -1071,6 +1150,7 @@ function openProductForm(id) {
     </div>
     <div class="field"><label>产品名称 *</label><input id="pf_name" value="${escAttr(product ? product.name : '')}"></div>
     <div class="field"><label>分类 *（可多选）</label><div class="category-checkbox-grid">${catOptions}</div></div>
+    <div class="field"><label>病害分类（可多选）</label><div class="category-checkbox-grid">${diseaseOptions || '<div class="product-image-empty">暂无病害分类，请先在病害菜单中添加</div>'}</div></div>
     <div class="row">
       <div class="field"><label>单字图标</label><input id="pf_iconText" value="${escAttr(product ? product.iconText || '' : '')}" maxlength="1" placeholder="如：菌"></div>
       <div class="field"><label>剂型 *</label><input id="pf_formulation" value="${escAttr(product ? product.formulation || '' : '')}" placeholder="如：微乳剂"></div>
@@ -1353,6 +1433,7 @@ function collectDynamicRows(containerId, prefix, isObject) {
 async function saveProduct() {
   const name = document.getElementById('pf_name').value.trim();
   const categoriesValue = getSelectedProductCategories();
+  const diseaseCategoriesValue = getSelectedProductDiseaseCategories();
   const category = categoriesValue[0] || '';
   const formulation = document.getElementById('pf_formulation').value.trim();
 
@@ -1373,6 +1454,7 @@ async function saveProduct() {
   const data = {
     name, category,
     categories: categoriesValue,
+    diseaseCategories: diseaseCategoriesValue,
     iconText: document.getElementById('pf_iconText').value.trim(),
     formulation,
     manufacturer: document.getElementById('pf_manufacturer').value.trim(),
@@ -1921,11 +2003,67 @@ async function deleteCategory(id, name) {
   }
 }
 
+// ===== Disease Category Form =====
+function openDiseaseCategoryForm(id) {
+  editingDiseaseCategoryId = id || null;
+  const cat = id ? diseaseCategories.find(c => c._id === id) : null;
+  document.getElementById('diseaseModalTitle').textContent = id ? '编辑病害分类' : '添加病害分类';
+
+  document.getElementById('diseaseModalBody').innerHTML = `
+    <div class="field"><label>病害分类名称 *</label><input id="dcf_name" value="${escAttr(cat ? cat.name : '')}" placeholder="如：白粉病"></div>
+    <div class="field"><label>单字图标</label><input id="dcf_iconText" value="${escAttr(cat ? cat.iconText || '' : '')}" maxlength="1" placeholder="如：粉"></div>
+    <div class="field"><label>排序序号</label><input type="number" id="dcf_sort" value="${cat ? (cat.sort || 0) : 0}"></div>
+    <div class="field"><label>启用状态</label><select id="dcf_status">
+      <option value="active" ${cat && cat.status === 'active' ? 'selected' : ''}>启用</option>
+      <option value="inactive" ${!cat || cat.status !== 'active' ? 'selected' : ''}>禁用</option>
+    </select></div>`;
+
+  document.getElementById('diseaseModal').classList.add('show');
+}
+
+async function saveDiseaseCategory() {
+  const name = document.getElementById('dcf_name').value.trim();
+  if (!name) { showToast('请填写病害分类名称'); return; }
+
+  const data = {
+    name,
+    iconText: document.getElementById('dcf_iconText').value.trim(),
+    sort: parseInt(document.getElementById('dcf_sort').value) || 0,
+    status: document.getElementById('dcf_status').value
+  };
+
+  try {
+    if (editingDiseaseCategoryId) {
+      await callAdminFunction({ type: 'adminUpdateDiseaseCategory', id: editingDiseaseCategoryId, data });
+    } else {
+      await callAdminFunction({ type: 'adminCreateDiseaseCategory', data });
+    }
+    closeModal('diseaseModal');
+    await loadDiseaseCategories();
+    renderAll();
+    showToast(editingDiseaseCategoryId ? '病害分类已更新' : '病害分类已创建');
+  } catch(e) { console.error('saveDiseaseCategory error:', e); showToast('操作失败: ' + (e.message || '')); }
+}
+
+async function deleteDiseaseCategory(id, name) {
+  if (!confirm('确认删除病害分类"' + name + '"？\\n删除病害分类不会修改已有产品，但该病害入口将不再显示。')) return;
+  try {
+    await callAdminFunction({ type: 'adminDeleteDiseaseCategory', id });
+    await loadDiseaseCategories();
+    renderAll();
+    showToast('病害分类已删除');
+  } catch(e) {
+    console.error('deleteDiseaseCategory error:', e);
+    showToast('删除失败: ' + (e.message || ''));
+  }
+}
+
 // ===== Modal =====
 function closeModal(id) {
   document.getElementById(id).classList.remove('show');
   if (id === 'productModal') editingProductId = null;
   if (id === 'categoryModal') editingCategoryId = null;
+  if (id === 'diseaseModal') editingDiseaseCategoryId = null;
   if (id === 'solutionModal') editingHotSolutionId = null;
 }
 
